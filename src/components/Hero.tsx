@@ -94,13 +94,25 @@ export const Hero: React.FC<HeroProps> = ({ onRegisterClick, onExploreClick }) =
               </p>
             </div>
 
-            {/* Main Headline: Bold Red Text with a Slow White Shine Every Few Seconds */}
-            <div className="relative inline-block select-none py-0.5">
-              <h1 className="font-cinzel text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black tracking-wider leading-[1.08]">
-                <span className="text-red-white-shine">
-                  BLACKHAWK
-                </span>
-              </h1>
+            {/* Main Headline with Integrated Emblem on Mobile */}
+            <div className="flex items-center gap-3 sm:gap-5 select-none py-0.5">
+              {/* Mobile Emblem Badge next to Text */}
+              <div className="relative shrink-0 w-14 sm:w-20 md:w-24 lg:hidden">
+                <div className="absolute inset-0 bg-[#D71920]/30 rounded-full blur-md" />
+                <img
+                  src="/assets/blackhawk_emblem_hq.png"
+                  alt="BlackHawk Emblem"
+                  className="w-full h-auto object-contain drop-shadow-[0_0_15px_rgba(215,25,32,0.45)] relative z-10"
+                />
+              </div>
+
+              <div className="relative inline-block">
+                <h1 className="font-cinzel text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black tracking-wider leading-[1.08]">
+                  <span className="text-red-white-shine">
+                    BLACKHAWK
+                  </span>
+                </h1>
+              </div>
             </div>
 
             {/* Subtitle */}
@@ -135,8 +147,8 @@ export const Hero: React.FC<HeroProps> = ({ onRegisterClick, onExploreClick }) =
             </div>
           </div>
 
-          {/* Right Column: High Quality Floating Physical BlackHawk Emblem */}
-          <div className="lg:col-span-5 xl:col-span-6 flex items-center justify-center relative py-4 sm:py-6 lg:py-0 pr-0 lg:pr-12">
+          {/* Right Column: High Quality Floating Physical BlackHawk Emblem (Desktop Only) */}
+          <div className="hidden lg:flex lg:col-span-5 xl:col-span-6 items-center justify-center relative py-4 sm:py-6 lg:py-0 pr-0 lg:pr-12">
             <div className="relative flex items-center justify-center w-full max-w-[260px] sm:max-w-[360px] lg:max-w-[440px]">
               {/* Refined Subtle Ambient Glow behind the BlackHawk Emblem */}
               <div className="absolute w-48 sm:w-64 h-48 sm:h-64 bg-[#D71920] opacity-20 rounded-full blur-[60px] sm:blur-[80px] pointer-events-none" />
