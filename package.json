@@ -1,0 +1,50 @@
+{
+  "name": "event-website",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -k -p \"[{name}]\" -n \"API,VITE\" -c \"red,cyan\" \"tsx watch server/index.ts\" \"vite\"",
+    "server": "tsx watch server/index.ts",
+    "server:dev": "tsx watch server/index.ts",
+    "server:build": "tsc -p server/tsconfig.json",
+    "server:start": "node dist-server/index.js",
+    "build:server": "tsc -p server/tsconfig.json",
+    "build:all": "tsc -b && vite build && tsc -p server/tsconfig.json",
+    "start": "node dist-server/index.js",
+    "client": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "oxlint",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "bcryptjs": "^3.0.3",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
+    "drizzle-orm": "^0.45.3",
+    "express": "^5.2.1",
+    "firebase": "^12.19.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/canvas-confetti": "^1.9.0",
+    "@types/cookie-parser": "^1.4.10",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^24.13.3",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "@vitejs/plugin-react": "^6.1.1",
+    "canvas-confetti": "^1.9.4",
+    "concurrently": "^10.0.5",
+    "lucide-react": "^1.48.0",
+    "oxlint": "^1.81.0",
+    "tailwindcss": "^4.3.3",
+    "tsx": "^4.23.15",
+    "typescript": "~6.0.2",
+    "vite": "^8.3.0"
+  }
+}
