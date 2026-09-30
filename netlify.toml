@@ -2,12 +2,7 @@
   command = "npm run build"
   publish = "dist"
 
-# If you deploy your backend (Render/Railway/Fly.io), uncomment and replace the URL below:
-# [[redirects]]
-#   from = "/api/*"
-#   to = "https://your-backend-api.onrender.com/api/:splat"
-#   status = 200
-#   force = true
+# The /api/* backend runs as a Netlify Function (netlify/functions/api.ts).
 
 # SPA client-side routing fallback
 [[redirects]]
