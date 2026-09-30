@@ -509,7 +509,8 @@ class TournamentStore {
 
   private async writeToRtdb(path: string, val: any) {
     try {
-      await set(ref(rtdb, path), sanitizeForFirebase(val));
+      // Write to blackhawk namespace
+      await set(ref(rtdb, `blackhawk/${path}`), sanitizeForFirebase(val));
       firebaseConnectionManager.setCustomStatus({
         state: 'connected',
         lastSyncedAt: new Date().toISOString()
@@ -521,7 +522,7 @@ class TournamentStore {
 
   private async removeFromRtdb(path: string) {
     try {
-      await remove(ref(rtdb, path));
+      await remove(ref(rtdb, `blackhawk/${path}`));
       firebaseConnectionManager.setCustomStatus({
         state: 'connected',
         lastSyncedAt: new Date().toISOString()
@@ -536,8 +537,8 @@ class TournamentStore {
     this.isFirebaseInitialized = true;
 
     try {
-      // 1. Events listener
-      onValue(ref(rtdb, 'events'), (snap) => {
+      // 1. Events listener (listen to blackhawk/events)
+      onValue(ref(rtdb, 'blackhawk/events'), (snap) => {
         if (snap.exists() && snap.val()) {
           const list = parseFirebaseList<EventRecord>(snap.val());
           if (list.length > 0) {
@@ -548,8 +549,8 @@ class TournamentStore {
         }
       }, (err) => this.handleRtdbError(err));
 
-      // 2. Players listener
-      onValue(ref(rtdb, 'players'), (snap) => {
+      // 2. Players listener (listen to blackhawk/players)
+      onValue(ref(rtdb, 'blackhawk/players'), (snap) => {
         if (snap.exists() && snap.val()) {
           const list = parseFirebaseList<PlayerRecord>(snap.val());
           if (list.length > 0) {
@@ -560,8 +561,8 @@ class TournamentStore {
         }
       }, (err) => this.handleRtdbError(err));
 
-      // 3. Registrations listener
-      onValue(ref(rtdb, 'registrations'), (snap) => {
+      // 3. Registrations listener (listen to blackhawk/registrations)
+      onValue(ref(rtdb, 'blackhawk/registrations'), (snap) => {
         if (snap.exists() && snap.val()) {
           const list = parseFirebaseList<RegistrationRecord>(snap.val());
           this.registrations = list.sort(
@@ -572,8 +573,8 @@ class TournamentStore {
         }
       }, (err) => this.handleRtdbError(err));
 
-      // 4. Results listener
-      onValue(ref(rtdb, 'results'), (snap) => {
+      // 4. Results listener (listen to blackhawk/results or match_scores)
+      onValue(ref(rtdb, 'blackhawk/results'), (snap) => {
         if (snap.exists() && snap.val()) {
           const list = parseFirebaseList<MatchResultRecord>(snap.val());
           this.results = list;
@@ -582,8 +583,8 @@ class TournamentStore {
         }
       }, (err) => this.handleRtdbError(err));
 
-      // 5. Draws listener
-      onValue(ref(rtdb, 'draws'), (snap) => {
+      // 5. Draws listener (listen to blackhawk/draws)
+      onValue(ref(rtdb, 'blackhawk/draws'), (snap) => {
         if (snap.exists() && snap.val()) {
           const list = parseFirebaseList<DrawRecord>(snap.val());
           this.draws = list.sort(
@@ -594,8 +595,8 @@ class TournamentStore {
         }
       }, (err) => this.handleRtdbError(err));
 
-      // 6. Audit logs listener
-      onValue(ref(rtdb, 'auditLogs'), (snap) => {
+      // 6. Audit logs listener (listen to blackhawk/auditLogs)
+      onValue(ref(rtdb, 'blackhawk/auditLogs'), (snap) => {
         if (snap.exists() && snap.val()) {
           const list = parseFirebaseList<AuditLogRecord>(snap.val());
           this.auditLogs = list
@@ -606,8 +607,8 @@ class TournamentStore {
         }
       }, (err) => this.handleRtdbError(err));
 
-      // 7. Rewards config listener
-      onValue(ref(rtdb, 'rewardsConfig'), (snap) => {
+      // 7. Rewards config listener (listen to blackhawk/rewardsConfig)
+      onValue(ref(rtdb, 'blackhawk/rewardsConfig'), (snap) => {
         if (snap.exists() && snap.val()) {
           this.rewardsConfig = { ...INITIAL_REWARDS, ...snap.val() };
           this.saveToLocalStorageOnly();
@@ -620,7 +621,7 @@ class TournamentStore {
     }
   }
 
-  // Seed or Force Push all current tournament state to Firebase RTDB
+  // Seed or Force Push all current tournament state to Firebase RTDB under blackhawk/
   async syncAllToFirebase(): Promise<{ success: boolean; error?: string }> {
     try {
       const mapList = <T extends { id: string }>(arr: T[]) => {
@@ -631,13 +632,13 @@ class TournamentStore {
         return m;
       };
 
-      await set(ref(rtdb, 'events'), mapList(this.events));
-      await set(ref(rtdb, 'players'), mapList(this.players));
-      await set(ref(rtdb, 'registrations'), mapList(this.registrations));
-      await set(ref(rtdb, 'results'), mapList(this.results));
-      await set(ref(rtdb, 'draws'), mapList(this.draws));
-      await set(ref(rtdb, 'auditLogs'), mapList(this.auditLogs));
-      await set(ref(rtdb, 'rewardsConfig'), sanitizeForFirebase(this.rewardsConfig));
+      await set(ref(rtdb, 'blackhawk/events'), mapList(this.events));
+      await set(ref(rtdb, 'blackhawk/players'), mapList(this.players));
+      await set(ref(rtdb, 'blackhawk/registrations'), mapList(this.registrations));
+      await set(ref(rtdb, 'blackhawk/results'), mapList(this.results));
+      await set(ref(rtdb, 'blackhawk/draws'), mapList(this.draws));
+      await set(ref(rtdb, 'blackhawk/auditLogs'), mapList(this.auditLogs));
+      await set(ref(rtdb, 'blackhawk/rewardsConfig'), sanitizeForFirebase(this.rewardsConfig));
 
       firebaseConnectionManager.setCustomStatus({
         state: 'connected',
