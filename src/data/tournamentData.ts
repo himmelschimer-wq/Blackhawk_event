@@ -498,7 +498,7 @@ export const FAQ_DATA: FAQItem[] = [
   {
     id: "faq-1",
     question: "What is the Gaming League?",
-    answer: "The Gaming League is a premier 5-week esports series hosted by Blackhawk Team featuring 5 diverse games, weekly cash prizes across multiple achievement categories, and a cumulative ₹600 Monthly League grand leaderboard."
+    answer: "The Gaming League is a premier 5-week tournament series hosted by Blackhawk Team featuring 5 diverse games, weekly cash prizes across multiple achievement categories, and a cumulative ₹600 Monthly League grand leaderboard."
   },
   {
     id: "faq-2",

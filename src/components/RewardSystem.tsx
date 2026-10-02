@@ -48,7 +48,7 @@ export const RewardSystem: React.FC = () => {
           <div className="w-14 h-0.5 bg-gradient-to-r from-transparent via-[#e10600] to-transparent mx-auto mb-4"></div>
 
           <p className="text-xs sm:text-sm text-zinc-300 font-sans leading-relaxed">
-            Esports is more than just raw rank. Blackhawk Team recognizes pure skill, clutch creativity, rapid development, active sportsmanship, and entertaining community memories.
+            Competition is more than just raw rank. Blackhawk Team recognizes pure skill, clutch creativity, rapid development, active sportsmanship, and entertaining community memories.
           </p>
         </div>
 

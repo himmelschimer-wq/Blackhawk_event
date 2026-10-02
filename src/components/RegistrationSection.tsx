@@ -939,7 +939,7 @@ export const RegistrationSection: React.FC<RegistrationProps> = ({
                               <input
                                 required
                                 type="text"
-                                placeholder="e.g. Mortal Esports"
+                                placeholder="e.g. Mortal Clan"
                                 value={bgmiTeamName}
                                 onChange={e => setBgmiTeamName(e.target.value)}
                                 className="w-full px-2.5 py-1.5 bg-black/60 border border-white/10 rounded font-tech text-base sm:text-xs text-white focus:outline-none focus:border-red-500"

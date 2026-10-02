@@ -23,7 +23,7 @@ const GAME_RULE_PRESETS: Record<string, { rules: string; generalRules: string; f
     rules: [
       '1. Custom Room ID & Password shared on Discord 15 minutes before match start.',
       '2. Mobile devices only (Smartphones). Emulators, iPad view mods, and physical trigger accessories are strictly forbidden.',
-      '3. Official Maps: Erangel (Match 1) & Miramar (Match 2). Standard esports circle shrink times.',
+      '3. Official Maps: Erangel (Match 1) & Miramar (Match 2). Standard competitive circle shrink times.',
       '4. Scoring: 1st Place: 10 pts, 2nd: 6 pts, 3rd: 5 pts, 4th: 4 pts, 5th: 3 pts, 6th: 2 pts, 7th-8th: 1 pt. Kill Point: 1 pt per kill.',
       '5. Team Captain must submit clear end-screen scoreboard screenshot in #match-results within 15 mins.'
     ].join('\n'),
@@ -237,7 +237,7 @@ export const AdminEvents: React.FC = () => {
     sfx.playClick();
     try {
       const selectedGame = games.find(g => g.id === formGameId);
-      const gameName = selectedGame ? selectedGame.name : 'Esports';
+      const gameName = selectedGame ? selectedGame.name : 'Gaming';
 
       const payload = {
         title: formTitle,
@@ -764,7 +764,7 @@ export const AdminEvents: React.FC = () => {
                     type="button"
                     onClick={() => applyRulesPreset(formGameId)}
                     className="px-2.5 py-1 rounded bg-red-950/80 hover:bg-red-900 border border-red-500/40 text-[10px] font-tech font-bold text-[#ff4d4d] hover:text-white uppercase transition-colors flex items-center gap-1 cursor-pointer self-start sm:self-auto"
-                    title="Auto-fill rules from competitive esports template"
+                    title="Auto-fill rules from tournament template"
                   >
                     <Sparkles className="w-3 h-3 text-[#f5c464]" />
                     <span>Auto-Fill {games.find(g => g.id === formGameId)?.name || 'Game'} Rules</span>
@@ -870,7 +870,7 @@ export const AdminEvents: React.FC = () => {
                       <p key={idx}>{r}</p>
                     ))
                   ) : (
-                    <p className="text-zinc-500 italic">Standard BlackHawk esports conduct applies.</p>
+                    <p className="text-zinc-500 italic">Standard BlackHawk community conduct applies.</p>
                   )}
                 </div>
               </div>

@@ -119,7 +119,7 @@ export const Hero: React.FC<HeroProps> = ({ onRegisterClick, onExploreClick }) =
 
             {/* Subtitle */}
             <p className="text-xs sm:text-sm md:text-base text-[#9a9aa0] max-w-xl font-normal leading-relaxed">
-              BlackHawk is a Discord community created by <span className="text-white font-medium">blackhawkop</span> where we host fun games and exciting events. This isn&apos;t a corporate esports organization — it&apos;s all about hosting fun community events to enjoy games even more with each other.
+              BlackHawk is a Discord community created by <span className="text-white font-medium">blackhawkop</span> where we host fun games and exciting events. This isn&apos;t a corporate setup — it&apos;s all about hosting fun community events to enjoy games even more with each other.
             </p>
 
             {/* Action Buttons: Full width & touch friendly on mobile */}

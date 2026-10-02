@@ -31,7 +31,7 @@ export const BlackhawkSection: React.FC = () => {
               </p>
 
               <p className="text-xs text-zinc-400 font-sans leading-relaxed">
-                We believe in creating authentic, transparent esports opportunities. From custom mobile lobbies to strategy board tournaments, our events reward dedication, continuous improvement, and the thrill of competition.
+                We believe in creating authentic, transparent tournament opportunities. From custom mobile lobbies to strategy board games, our events reward dedication, teamwork, and the thrill of competition.
               </p>
 
               {/* Host Pillars */}

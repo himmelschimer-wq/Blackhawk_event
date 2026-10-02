@@ -52,7 +52,7 @@ export const RulesSection: React.FC = () => {
           <div className="w-14 h-0.5 bg-gradient-to-r from-transparent via-[#e10600] to-transparent mx-auto mb-4"></div>
 
           <p className="text-xs sm:text-sm text-zinc-300 font-sans leading-relaxed">
-            Every match is governed by strict esports standards ensuring integrity, sportsmanlike etiquette, and prompt prize settlement.
+            Every match is governed by strict tournament standards ensuring integrity, sportsmanlike etiquette, and prompt prize settlement.
           </p>
         </div>
 

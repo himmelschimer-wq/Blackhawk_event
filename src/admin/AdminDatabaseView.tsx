@@ -13,7 +13,7 @@ interface TableMeta {
 
 const TABLES: TableMeta[] = [
   { id: 'players', label: 'PLAYERS', desc: 'Registered athlete profiles and gamer identity data' },
-  { id: 'games', label: 'GAMES', desc: 'Supported esports titles, banners, and activity flags' },
+  { id: 'games', label: 'GAMES', desc: 'Supported games, banners, and activity flags' },
   { id: 'events', label: 'EVENTS', desc: 'Tournament schedules, prize pools, and rule sheets' },
   { id: 'registrations', label: 'REGISTRATIONS', desc: 'Tournament participation entries and roster rosters' },
   { id: 'leaderboard', label: 'LEADERBOARD', desc: 'Real-time ranking calculations, points, and score ties' },

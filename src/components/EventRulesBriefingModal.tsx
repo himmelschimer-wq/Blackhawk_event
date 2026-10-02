@@ -157,7 +157,7 @@ export const EventRulesBriefingModal: React.FC<EventRulesBriefingModalProps> = (
                 ))
               ) : (
                 <p className="text-xs text-zinc-400">
-                  Standard esports rules apply. No emulators, third-party scripts, or aim assist tools permitted.
+                  Standard tournament rules apply. No emulators, third-party scripts, or aim assist tools permitted.
                 </p>
               )}
             </div>

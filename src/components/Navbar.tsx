@@ -75,7 +75,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <img
               src="/assets/blackhawk_navbar_logo.png"
-              alt="BlackHawk Esports"
+              alt="BlackHawk"
               className="h-7 w-auto object-contain transition-transform group-hover:scale-105 duration-200"
             />
           </a>
