@@ -315,3 +315,41 @@ EXCEPTION
     WHEN duplicate_object THEN NULL;
     WHEN others THEN NULL;
 END $$;
+
+-- ==============================================================================
+-- INITIAL SEED DATA
+-- ==============================================================================
+
+-- 1. Secure Admin Seed
+INSERT INTO public.admins (id, username, display_name, password_hash, role)
+VALUES (
+    'adm-mistmaylie',
+    'mistmaylie',
+    'BlackHawk High Command',
+    '$2b$10$jU2MmnrNw4l5h8SH/2/ouOMKWWZdhJSuI65Kwq2ZYenB.CP.6sc/K',
+    'ADMIN'
+)
+ON CONFLICT (username) DO UPDATE SET
+    password_hash = EXCLUDED.password_hash,
+    display_name = EXCLUDED.display_name;
+
+-- 2. Official Games Seed
+INSERT INTO public.games (id, name, description, logo, banner, category, default_prize_pool, format, active)
+VALUES 
+('freefire', 'FREE FIRE', 'Free Fire high-octane survival clash, squad gauntlet & 1v1 challenge.', '/assets/badge_freefire.png', '/assets/official_game_freefire.png', 'SURVIVAL SHOOTER', 700, 'SQUAD & 1v1', true),
+('bgmi', 'BGMI', 'Battlegrounds Mobile India premier championship series.', '/assets/badge_bgmi.png', '/assets/official_game_bgmi.png', 'BATTLE ROYALE', 350, 'SOLO / SQUAD', true),
+('valorant', 'VALORANT', '5v5 tactical spike rush, precision gunplay, and clutch tournament.', '/assets/badge_valorant.png', '/assets/official_game_valorant.png', 'TACTICAL 5v5', 20000, '5v5', true),
+('minecraft', 'MINECRAFT', 'Competitive build battle, survival games, and PvP arena clash.', '/assets/badge_minecraft.png', '/assets/official_game_minecraft.png', 'BUILD & PVP', 350, 'SOLO', true),
+('chess', 'CHESS', 'Rapid and blitz tactical mastery across 64 squares.', '/assets/badge_bgmi.png', '/assets/official_game_bgmi.png', 'STRATEGY', 200, 'SOLO', true),
+('scribble', 'SCRIBBLE', 'Lightning speed sketch & guess community showdown.', '/assets/badge_minecraft.png', '/assets/official_game_minecraft.png', 'PARTY & CASUAL', 150, 'SOLO', true)
+ON CONFLICT (id) DO NOTHING;
+
+-- 3. Initial Premier Events Seed
+INSERT INTO public.events (id, game_id, game_name, title, description, date, time, format, prize_pool, max_participants, registration_status, event_status, rules, general_rules, banner)
+VALUES
+('ev-ff-1', 'freefire', 'FREE FIRE', 'Free Fire Squad Showdown & 1v1 Gauntlet', 'Intense squad battle royale featuring Event Winner (₹300), Random Draw (₹50), Best Performance (₹50), Highest Eliminations (₹100), and the Double or -₹100 1v1 Challenge (₹200).', 'OCT 15, 2026', '7:00 PM', 'SQUAD & 1v1', 700, 48, 'OPEN', 'REGISTRATION OPEN', '1. 4-Man Squad custom room + optional 1v1 Gauntlet showdown.\n2. Mobile devices only.\n3. Character skills & loadouts are permitted.', '1. Discord check-in mandatory 15 minutes before match.\n2. Fair play enforced.\n3. UPI payouts within 24-48 hours.', '/assets/official_game_freefire.png'),
+('ev-bgmi-1', 'bgmi', 'BGMI', 'BGMI Squad Erangel Clash', 'Premier squad battle royale tournament across Erangel and Miramar.', 'OCT 12, 2026', '6:00 PM', 'SQUAD', 350, 64, 'OPEN', 'REGISTRATION OPEN', '1. Squad custom room lobby.\n2. Mobile devices only.\n3. Squad captain must submit end-game screenshot.', '1. Discord check-in mandatory.\n2. Zero tolerance for hacking.\n3. Transparent prize payouts.', '/assets/official_game_bgmi.png'),
+('ev-val-1', 'valorant', 'VALORANT', 'Valorant 5v5 Spike Rush Cup', 'Single elimination bracket 5v5 spike plant competitive tournament.', 'OCT 18, 2026', '6:00 PM', '5v5', 20000, 16, 'OPEN', 'REGISTRATION OPEN', '1. 5v5 Spike Plant competitive custom tournament mode.\n2. Riot Vanguard active.\n3. Tactical timeouts permitted.', '1. Discord voice rooms used for team comms.\n2. Sportsmanship enforced.\n3. Instant prize distribution.', '/assets/official_game_valorant.png'),
+('ev-mc-1', 'minecraft', 'MINECRAFT', 'Minecraft Build Battle & Survival', 'Fast-paced theme building and PvP survival gauntlet.', 'OCT 20, 2026', '5:00 PM', 'SOLO', 350, 32, 'OPEN', 'REGISTRATION OPEN', '1. Custom vanilla server with anti-cheat.\n2. No hacked clients or X-ray mods.', '1. Join Discord voice channels.\n2. Fair play rules apply.', '/assets/official_game_minecraft.png')
+ON CONFLICT (id) DO NOTHING;
+

@@ -58,36 +58,23 @@ export const adminApi = {
 
   // ─── AUTH ────────────────────────────────────────────────────────────────
   async login(username: string, password: string): Promise<{ token: string; admin: AdminUser }> {
-    try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
-      });
-      const contentType = res.headers.get('content-type') || '';
-      if (res.ok && contentType.includes('application/json')) {
-        const data = await res.json();
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+
+    const contentType = res.headers.get('content-type') || '';
+    if (res.ok && contentType.includes('application/json')) {
+      const data = await res.json();
+      if (data && data.token) {
         this.setToken(data.token);
         return data;
       }
-    } catch {
-      // Backend not reached, verify with local admin fallback credentials
     }
 
-    // Direct fallback credentials for offline / Netlify preview
-    if ((username === 'admin' && (password === 'admin123' || password === 'admin' || password === 'blackhawk2026!' || password === 'blackhawk2026')) || username === 'operator') {
-      const fallbackToken = `session_${Date.now()}_${Math.random().toString(36).substring(2)}`;
-      const admin: AdminUser = {
-        id: 'adm-default',
-        username: username,
-        displayName: 'BlackHawk High Command',
-        role: 'ADMIN'
-      };
-      this.setToken(fallbackToken);
-      return { token: fallbackToken, admin };
-    }
-
-    throw new Error('Invalid credentials');
+    const errData = await res.json().catch(() => ({ error: 'Invalid admin credentials' }));
+    throw new Error(errData.error || 'Invalid credentials or authorization failed');
   },
 
   async logout(): Promise<void> {
