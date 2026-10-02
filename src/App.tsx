@@ -12,6 +12,7 @@ import { MobileBottomBar } from './components/MobileBottomBar';
 import { AdminControlRoom } from './admin/AdminControlRoom';
 import { AdminLogin } from './admin/AdminLogin';
 import { DiscordCallback } from './components/DiscordCallback';
+import { IntroSplash } from './components/IntroSplash';
 import { adminApi } from './lib/adminApi';
 import { type DBEventItem } from './components/UpcomingEventsAndLeaderboard';
 
@@ -25,6 +26,7 @@ export function App() {
   const [adminTab, setAdminTab] = useState<string>('dashboard');
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [authChecking, setAuthChecking] = useState<boolean>(true);
+  const [showIntroSplash, setShowIntroSplash] = useState<boolean>(true);
 
   // Modals state
   const [isRegModalOpen, setIsRegModalOpen] = useState(false);
@@ -170,60 +172,83 @@ export function App() {
     );
   }
 
+  const [siteRevealed, setSiteRevealed] = useState(false);
+
   // Otherwise, render Public BlackHawk Esports Experience
   return (
     <div className="min-h-screen bg-[#080808] text-[#e5e5e5] font-sans antialiased selection:bg-[#D71920] selection:text-white">
+      {/* 3-Second Animated Graphics Flash Splash with Dual Crossed Swords & BlackHawk Typography */}
+      {showIntroSplash && (
+        <IntroSplash 
+          durationMs={3000} 
+          onComplete={() => {
+            setShowIntroSplash(false);
+            setSiteRevealed(true);
+          }} 
+        />
+      )}
+
       {/* Minimal Fixed Navigation Bar */}
-      <Navbar
-        onRegisterClick={() => openRegistration()}
-        onNavigate={scrollToSection}
-        onOpenRules={() => setIsRulesModalOpen(true)}
-        onOpenAbout={() => setIsAboutModalOpen(true)}
-      />
+      <div className={siteRevealed ? 'animate-site-navbar' : ''}>
+        <Navbar
+          onRegisterClick={() => openRegistration()}
+          onNavigate={scrollToSection}
+          onOpenRules={() => setIsRulesModalOpen(true)}
+          onOpenAbout={() => setIsAboutModalOpen(true)}
+        />
+      </div>
 
       <main>
         {/* Asymmetric Cinematic Hero Section */}
-        <Hero
-          onRegisterClick={() => openRegistration()}
-          onExploreClick={() => scrollToSection('events')}
-        />
+        <div className={siteRevealed ? 'animate-site-hero' : ''}>
+          <Hero
+            onRegisterClick={() => openRegistration()}
+            onExploreClick={() => scrollToSection('events')}
+          />
+        </div>
 
         {/* Choose Your Game Section */}
-        <ChooseYourGame
-          selectedGame={activeGameFilter !== 'ALL' ? activeGameFilter : undefined}
-          onSelectGame={(gameName) => {
-            setActiveGameFilter(gameName);
-            scrollToSection('events');
-          }}
-          onViewEventsForGame={(gameName) => {
-            setActiveGameFilter(gameName);
-            scrollToSection('events');
-          }}
-        />
+        <div className={siteRevealed ? 'animate-site-content' : ''}>
+          <ChooseYourGame
+            selectedGame={activeGameFilter !== 'ALL' ? activeGameFilter : undefined}
+            onSelectGame={(gameName) => {
+              setActiveGameFilter(gameName);
+              scrollToSection('events');
+            }}
+            onViewEventsForGame={(gameName) => {
+              setActiveGameFilter(gameName);
+              scrollToSection('events');
+            }}
+          />
+        </div>
 
         {/* Upcoming Events Editorial Table & Leaderboard */}
-        <UpcomingEventsAndLeaderboard
-          activeGameFilter={activeGameFilter}
-          onSelectGameFilter={(gameName) => setActiveGameFilter(gameName)}
-          onSelectEvent={(event) => {
-            setBriefingEvent(event);
-            setIsBriefingModalOpen(true);
-          }}
-          onRegisterEvent={(gameName, eventId) => openRegistration(gameName, eventId)}
-          onViewAllEvents={() => {
-            setActiveGameFilter('ALL');
-            scrollToSection('games');
-          }}
-          onViewFullLeaderboard={() => scrollToSection('leaderboard')}
-        />
+        <div className={siteRevealed ? 'animate-site-content' : ''}>
+          <UpcomingEventsAndLeaderboard
+            activeGameFilter={activeGameFilter}
+            onSelectGameFilter={(gameName) => setActiveGameFilter(gameName)}
+            onSelectEvent={(event) => {
+              setBriefingEvent(event);
+              setIsBriefingModalOpen(true);
+            }}
+            onRegisterEvent={(gameName, eventId) => openRegistration(gameName, eventId)}
+            onViewAllEvents={() => {
+              setActiveGameFilter('ALL');
+              scrollToSection('games');
+            }}
+            onViewFullLeaderboard={() => scrollToSection('leaderboard')}
+          />
+        </div>
       </main>
 
       {/* Clean Minimal Footer */}
-      <Footer
-        onNavigate={scrollToSection}
-        onOpenRules={() => setIsRulesModalOpen(true)}
-        onOpenAbout={() => setIsAboutModalOpen(true)}
-      />
+      <div className={siteRevealed ? 'animate-site-footer' : ''}>
+        <Footer
+          onNavigate={scrollToSection}
+          onOpenRules={() => setIsRulesModalOpen(true)}
+          onOpenAbout={() => setIsAboutModalOpen(true)}
+        />
+      </div>
 
       {/* Floating Mobile Bottom Navigation Dock */}
       <MobileBottomBar

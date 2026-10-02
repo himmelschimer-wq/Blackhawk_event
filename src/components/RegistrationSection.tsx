@@ -451,7 +451,7 @@ export const RegistrationSection: React.FC<RegistrationProps> = ({
       }
 
       if (!result) {
-        throw new Error('Could not record registration in database.');
+        throw new Error('Could not complete tournament registration. Please try again.');
       }
 
       const confirmedPlayerName = result.player?.fullName || result.player?.full_name || fullName;
@@ -539,7 +539,7 @@ export const RegistrationSection: React.FC<RegistrationProps> = ({
         <div className="text-center mb-3 sm:mb-4">
           <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-red-950/40 border border-red-500/30 text-[#ff4d4d] font-tech text-[10px] tracking-wider uppercase mb-1">
             <Sparkles className="w-2.5 h-2.5" />
-            <span>INSTANT DATABASE REGISTRATION</span>
+            <span>OFFICIAL TOURNAMENT REGISTRATION</span>
           </div>
 
           <h2 className="font-cinzel font-bold text-lg sm:text-2xl text-white uppercase tracking-tight">
@@ -551,7 +551,7 @@ export const RegistrationSection: React.FC<RegistrationProps> = ({
         {!confirmedPass ? (
           <div className="bg-[#0c0c10] border border-white/10 rounded-xl sm:rounded-2xl p-3 sm:p-5 shadow-[0_0_30px_rgba(0,0,0,0.8)] relative">
             
-            {/* Step 1: Select One or Multiple Events from Real Database */}
+            {/* Step 1: Select One or Multiple Events */}
             <div className="mb-4 sm:mb-5">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-2 border-b border-white/10 mb-2.5 gap-2">
                 <span className="font-tech text-xs uppercase tracking-widest text-zinc-300 font-bold flex items-center gap-1.5">
@@ -632,11 +632,11 @@ export const RegistrationSection: React.FC<RegistrationProps> = ({
               {/* Tournament Events Grid */}
               {loadingGames ? (
                 <div className="py-8 text-center text-zinc-500 font-tech text-xs">
-                  Loading available tournament events from database...
+                  Loading official tournament schedule...
                 </div>
               ) : displayedEvents.length === 0 ? (
                 <div className="py-8 text-center text-zinc-500 font-tech text-xs border border-dashed border-white/10 rounded-xl">
-                  No active tournament events found for this filter.
+                  No active tournament events found for this discipline.
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -1176,7 +1176,7 @@ export const RegistrationSection: React.FC<RegistrationProps> = ({
 
               <div className="text-center">
                 <span className="font-tech text-[11px] text-zinc-500 uppercase tracking-widest">
-                  BLACKHAWK TOURNAMENT PLATFORM • DATABASE SYNCED
+                  BLACKHAWK TOURNAMENT PLATFORM • OFFICIAL VERIFIED SYSTEM
                 </span>
               </div>
 
@@ -1195,7 +1195,7 @@ export const RegistrationSection: React.FC<RegistrationProps> = ({
                   YOU'RE IN • {confirmedPass.registrations.length} {confirmedPass.registrations.length === 1 ? 'DISCIPLINE' : 'DISCIPLINES'}
                 </span>
                 <span className="block font-tech text-[11px] text-zinc-400 mt-0.5 uppercase">
-                  STATUS: VERIFIED & REGISTERED IN DATABASE
+                  STATUS: OFFICIAL TOURNAMENT ENTRY CONFIRMED
                 </span>
               </div>
             </div>

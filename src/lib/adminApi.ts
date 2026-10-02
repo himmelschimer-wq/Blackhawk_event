@@ -727,11 +727,43 @@ export const adminApi = {
   },
 
   async createLeaderboardEntry(data: any) {
+    try {
+      const res = await fetch('/api/leaderboard', {
+        method: 'POST',
+        headers: this.getAuthHeaders(),
+        body: JSON.stringify(data)
+      });
+      if (res.ok) {
+        const json = await res.json();
+        saveToLocalFallback('leaderboard', normalizeDbRow(json));
+        return normalizeDbRow(json);
+      }
+    } catch {}
+
     const id = data.id || `lb_${Date.now()}`;
+    const normalized = normalizeDbRow({ ...data, id });
+
     if (isSupabaseConfigured) {
-      await supabase.from('leaderboard').upsert({ ...data, id });
+      try {
+        await supabase.from('leaderboard').upsert({
+          id,
+          player_id: data.playerId || data.player_id || `ply_${Date.now()}`,
+          player_name: data.playerName || data.player_name,
+          gamer_tag: data.gamerTag || data.gamer_tag,
+          discord_username: data.discordUsername || data.discord_username || 'N/A',
+          game: data.game || 'ALL',
+          points: Number(data.points) || 0,
+          wins: Number(data.wins) || 0,
+          matches: Number(data.matches) || 0,
+          score: Number(data.score) || 0,
+          avatar: data.avatar || ''
+        });
+      } catch (e) {
+        console.warn('Supabase createLeaderboardEntry error:', e);
+      }
     }
-    return { ...data, id };
+    saveToLocalFallback('leaderboard', normalized);
+    return normalized;
   },
 
   async resetLeaderboard(id: string) {
@@ -750,6 +782,14 @@ export const adminApi = {
   },
 
   async deleteLeaderboard(id: string) {
+    try {
+      const res = await fetch(`/api/leaderboard/${id}`, {
+        method: 'DELETE',
+        headers: this.getAuthHeaders()
+      });
+      if (res.ok) return await res.json();
+    } catch {}
+
     if (isSupabaseConfigured) {
       await supabase.from('leaderboard').delete().eq('id', id);
     }

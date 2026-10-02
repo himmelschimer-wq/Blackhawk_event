@@ -86,7 +86,7 @@ export const UpcomingEventsAndLeaderboard: React.FC<UpcomingEventsAndLeaderboard
     try {
       const data = await safeFetchJson<any[]>('/api/leaderboard', [], 'leaderboard');
       if (Array.isArray(data)) {
-        setLeaderboard(data.slice(0, 5)); // Top 5 warriors for homepage
+        setLeaderboard(data);
       }
     } catch (err) {
       console.warn('Failed to load leaderboard:', err);
@@ -109,6 +109,17 @@ export const UpcomingEventsAndLeaderboard: React.FC<UpcomingEventsAndLeaderboard
       (e.gameId && e.gameId.toLowerCase() === gLower)
     );
   });
+
+  // Filter leaderboard based on selected game with re-ranked positions according to points
+  const filteredLeaderboard = (
+    !selectedGame || selectedGame === 'ALL'
+      ? leaderboard
+      : leaderboard.filter(p => (p.game || '').toLowerCase() === selectedGame.toLowerCase() || (p.game || '').toUpperCase() === 'ALL')
+  ).map((item, idx) => ({
+    ...item,
+    rank: idx + 1,
+    crown: idx === 0
+  }));
 
   // Unique game names from events
   const gameTabs = ['ALL', ...Array.from(new Set(events.map(e => e.gameName?.toUpperCase() || ''))).filter(Boolean)];
@@ -315,8 +326,8 @@ export const UpcomingEventsAndLeaderboard: React.FC<UpcomingEventsAndLeaderboard
                 <span>POINTS</span>
               </div>
 
-              {/* Empty State from Database */}
-              {!loadingLeaderboard && leaderboard.length === 0 && (
+              {/* Empty State */}
+              {!loadingLeaderboard && filteredLeaderboard.length === 0 && (
                 <div className="py-10 text-center text-zinc-500">
                   <Trophy className="w-7 h-7 text-zinc-600 mx-auto mb-2" />
                   <p className="font-cinzel text-xs text-zinc-400">NO LEADERBOARD RANKINGS YET</p>
@@ -325,8 +336,8 @@ export const UpcomingEventsAndLeaderboard: React.FC<UpcomingEventsAndLeaderboard
               )}
 
               {/* Player Rows with Automatic Ranking */}
-              <div className="divide-y divide-white/[0.04]">
-                {leaderboard.map((player) => (
+              <div className="divide-y divide-white/[0.04] max-h-[500px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-white/10">
+                {filteredLeaderboard.map((player) => (
                   <div
                     key={player.id}
                     onClick={() => {

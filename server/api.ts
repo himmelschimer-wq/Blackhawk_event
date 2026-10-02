@@ -780,20 +780,105 @@ apiRouter.delete('/players/:id', requireAdminAuth, async (req: Request, res: Res
 apiRouter.get('/leaderboard', async (req: Request, res: Response) => {
   try {
     const game = req.query.game as string | undefined;
-    let entries = await supabaseDb.list<any>('leaderboard');
+    const [lbEntries, allPlayers, allRegistrations] = await Promise.all([
+      supabaseDb.list<any>('leaderboard'),
+      supabaseDb.list<any>('players'),
+      supabaseDb.list<any>('registrations')
+    ]);
 
-    // Filter active
-    entries = entries.filter(l => l.status === 'ACTIVE' || !l.status);
+    // Map existing leaderboard entries by unique player+game identifier or gamerTag
+    const map = new Map<string, any>();
 
-    if (game && game !== 'ALL') {
-      entries = entries.filter(l => l.game === game);
+    // 1. Add existing explicit leaderboard entries
+    for (const lb of lbEntries) {
+      if (lb.status && lb.status !== 'ACTIVE') continue;
+      const cleanTag = (lb.gamerTag || lb.gamer_tag || '').trim().toLowerCase();
+      if (!cleanTag) continue;
+      const lbGame = lb.game || 'ALL';
+      const key = `${cleanTag}_${lbGame.toLowerCase()}`;
+      map.set(key, {
+        id: lb.id || `lb_${cleanTag}`,
+        playerId: lb.playerId || lb.player_id || `ply_${cleanTag}`,
+        playerName: lb.playerName || lb.player_name || lb.gamerTag || lb.gamer_tag,
+        gamerTag: lb.gamerTag || lb.gamer_tag,
+        discordUsername: lb.discordUsername || lb.discord_username || 'N/A',
+        game: lbGame,
+        avatar: lb.avatar || getDiscordAvatar(lb.discordUsername || lb.discord_username, lb.gamerTag || lb.gamer_tag),
+        points: Number(lb.points) || 0,
+        wins: Number(lb.wins) || 0,
+        matches: Number(lb.matches) || 0,
+        score: Number(lb.score) || 0,
+        status: lb.status || 'ACTIVE'
+      });
     }
 
-    // Dynamic Deterministic Rank Sort: points DESC -> wins DESC -> score DESC -> matches ASC
+    // 2. Merge registered players from players table
+    for (const p of allPlayers) {
+      if (p.status && p.status !== 'ACTIVE') continue;
+      const cleanTag = (p.gamerTag || p.gamer_tag || '').trim().toLowerCase();
+      if (!cleanTag) continue;
+      const pGame = p.game || 'ALL';
+      const key = `${cleanTag}_${pGame.toLowerCase()}`;
+      
+      if (!map.has(key)) {
+        map.set(key, {
+          id: 'lb-' + p.id,
+          playerId: p.id,
+          playerName: p.fullName || p.full_name || p.gamerTag || p.gamer_tag,
+          gamerTag: p.gamerTag || p.gamer_tag,
+          discordUsername: p.discordUsername || p.discord_username || 'N/A',
+          game: pGame,
+          avatar: p.avatar || getDiscordAvatar(p.discordUsername || p.discord_username, p.gamerTag || p.gamer_tag),
+          points: Number(p.points) || 0,
+          wins: Number(p.wins) || 0,
+          matches: Number(p.matches) || 0,
+          score: Number(p.score) || 0,
+          status: 'ACTIVE'
+        });
+      }
+    }
+
+    // 3. Merge players from tournament registrations table
+    for (const reg of allRegistrations) {
+      if (reg.status && reg.status === 'REJECTED') continue;
+      const cleanTag = (reg.gamerTag || reg.gamer_tag || '').trim().toLowerCase();
+      if (!cleanTag) continue;
+      const regGame = reg.gameName || reg.gameId || 'ALL';
+      const key = `${cleanTag}_${regGame.toLowerCase()}`;
+
+      if (!map.has(key)) {
+        map.set(key, {
+          id: 'lb-' + reg.id,
+          playerId: reg.playerId || reg.player_id || `ply_${reg.id}`,
+          playerName: reg.playerName || reg.player_name || reg.gamerTag || reg.gamer_tag,
+          gamerTag: reg.gamerTag || reg.gamer_tag,
+          discordUsername: reg.discordUsername || reg.discord_username || 'N/A',
+          game: regGame,
+          avatar: getDiscordAvatar(reg.discordUsername || reg.discord_username, reg.gamerTag || reg.gamer_tag),
+          points: 0,
+          wins: 0,
+          matches: 0,
+          score: 0,
+          status: 'ACTIVE'
+        });
+      }
+    }
+
+    let entries = Array.from(map.values());
+
+    // Filter by game discipline if requested
+    if (game && game !== 'ALL') {
+      const gLower = game.toLowerCase();
+      entries = entries.filter(l => (l.game || '').toLowerCase() === gLower || (l.game || '').toLowerCase() === 'all');
+    }
+
+    // Dynamic Deterministic Rank Sort: points DESC -> wins DESC -> score DESC -> matches ASC -> gamerTag ASC
     entries.sort((a, b) => {
       if ((b.points || 0) !== (a.points || 0)) return (b.points || 0) - (a.points || 0);
       if ((b.wins || 0) !== (a.wins || 0)) return (b.wins || 0) - (a.wins || 0);
-      return (b.score || 0) - (a.score || 0);
+      if ((b.score || 0) !== (a.score || 0)) return (b.score || 0) - (a.score || 0);
+      if ((a.matches || 0) !== (b.matches || 0)) return (a.matches || 0) - (b.matches || 0);
+      return (a.gamerTag || '').localeCompare(b.gamerTag || '');
     });
 
     const ranked = entries.map((r, index) => {
@@ -810,6 +895,59 @@ apiRouter.get('/leaderboard', async (req: Request, res: Response) => {
     });
 
     res.json(ranked);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+apiRouter.post('/leaderboard', requireAdminAuth, async (req: Request, res: Response) => {
+  try {
+    const {
+      playerName, gamerTag, game, points = 0, wins = 0, matches = 0, score = 0, status = 'ACTIVE', avatar
+    } = req.body;
+
+    if (!playerName || !gamerTag) {
+      return res.status(400).json({ error: 'Player Name and Gamer Tag are required.' });
+    }
+
+    const playerId = req.body.playerId || 'ply-' + Date.now().toString(36) + Math.random().toString(36).substring(2, 5);
+    const lbId = 'lb-' + Date.now().toString(36) + Math.random().toString(36).substring(2, 5);
+    const pfp = avatar || getDiscordAvatar(req.body.discordUsername || 'N/A', gamerTag);
+
+    const entry = {
+      id: lbId,
+      playerId,
+      playerName,
+      gamerTag,
+      discordUsername: req.body.discordUsername || 'N/A',
+      game: game || 'ALL',
+      points: Number(points) || 0,
+      wins: Number(wins) || 0,
+      matches: Number(matches) || 0,
+      score: Number(score) || 0,
+      avatar: pfp,
+      status: status || 'ACTIVE',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    await supabaseDb.set(`blackhawk/leaderboard/${playerId}`, entry);
+
+    // Also ensure player row exists in players table
+    const existingPlayer = await supabaseDb.get<any>(`blackhawk/players/${playerId}`);
+    if (!existingPlayer) {
+      await supabaseDb.set(`blackhawk/players/${playerId}`, {
+        id: playerId,
+        fullName: playerName,
+        gamerTag,
+        discordUsername: req.body.discordUsername || 'N/A',
+        game: game || 'ALL',
+        status: 'ACTIVE',
+        createdAt: new Date().toISOString()
+      });
+    }
+
+    res.status(201).json(entry);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -843,6 +981,38 @@ apiRouter.patch('/leaderboard/:id', requireAdminAuth, async (req: Request, res: 
     };
 
     await supabaseDb.set(`blackhawk/leaderboard/${key}`, updated);
+    res.json(updated);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+apiRouter.delete('/leaderboard/:id', requireAdminAuth, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    await supabaseDb.delete(`blackhawk/leaderboard/${id}`);
+    res.json({ success: true, message: `Leaderboard entry ${id} deleted.` });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+apiRouter.post('/leaderboard/:id/reset', requireAdminAuth, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const existing = await supabaseDb.get<any>(`blackhawk/leaderboard/${id}`);
+    if (!existing) return res.status(404).json({ error: 'Leaderboard entry not found.' });
+
+    const updated = {
+      ...existing,
+      points: 0,
+      score: 0,
+      wins: 0,
+      matches: 0,
+      updatedAt: new Date().toISOString()
+    };
+
+    await supabaseDb.set(`blackhawk/leaderboard/${id}`, updated);
     res.json(updated);
   } catch (err: any) {
     res.status(500).json({ error: err.message });

@@ -157,5 +157,57 @@
   filter: drop-shadow(0 0 20px rgba(215, 25, 32, 0.35));
 }
 
+/* ─── Site Entrance Animations (Matching BlackHawk Flash Intro) ─── */
+@keyframes siteRevealNavbar {
+  0% {
+    opacity: 0;
+    transform: translateY(-16px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes siteRevealHero {
+  0% {
+    opacity: 0;
+    transform: scale(0.975) translateY(24px);
+    filter: brightness(0.6) drop-shadow(0 0 40px rgba(215, 25, 32, 0.5));
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    filter: brightness(1) drop-shadow(0 0 0px transparent);
+  }
+}
+
+@keyframes siteRevealContent {
+  0% {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-site-navbar {
+  animation: siteRevealNavbar 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-site-hero {
+  animation: siteRevealHero 0.95s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both;
+}
+
+.animate-site-content {
+  animation: siteRevealContent 1s cubic-bezier(0.16, 1, 0.3, 1) 0.25s both;
+}
+
+.animate-site-footer {
+  animation: siteRevealContent 1s cubic-bezier(0.16, 1, 0.3, 1) 0.4s both;
+}
+
 
 
