@@ -87,7 +87,6 @@ export const RegistrationSection: React.FC<RegistrationProps> = ({
   // Free Fire
   const [ffUid, setFfUid] = useState('');
   const [ffIgn, setFfIgn] = useState('');
-  const [ffPlayType, setFfPlayType] = useState<'Solo' | 'Team / Squad'>('Solo');
   const [ffTeamName, setFfTeamName] = useState('');
   const [ffTeamMembers, setFfTeamMembers] = useState('');
 
@@ -100,9 +99,27 @@ export const RegistrationSection: React.FC<RegistrationProps> = ({
   // Minecraft
   const [mcUsername, setMcUsername] = useState('');
   const [mcEdition, setMcEdition] = useState<'Java' | 'Bedrock'>('Java');
-  const [mcPlayType, setMcPlayType] = useState<'Solo' | 'Team / Squad'>('Solo');
   const [mcTeamName, setMcTeamName] = useState('');
   const [mcTeamMembers, setMcTeamMembers] = useState('');
+
+  // Helper to determine the format strictly from the event created in admin panel
+  const getGameFormat = (gameName: string): string => {
+    const matchingEvent = dbEvents.find(
+      e => selectedEventIds.includes(e.id) && (
+        (e.gameName || '').toLowerCase().includes(gameName.toLowerCase()) ||
+        gameName.toLowerCase().includes((e.gameName || '').toLowerCase())
+      )
+    ) || dbEvents.find(
+      e => (e.gameName || '').toLowerCase().includes(gameName.toLowerCase())
+    );
+
+    return (matchingEvent?.format || 'SOLO').trim().toUpperCase();
+  };
+
+  const isTeamFormat = (formatStr: string): boolean => {
+    const f = (formatStr || '').toUpperCase();
+    return f.includes('SQUAD') || f.includes('DUO') || f.includes('5V5') || f.includes('TEAM') || f.includes('4V4') || f.includes('2V2');
+  };
 
   // Collapsed sections toggle
   const [collapsedCards, setCollapsedCards] = useState<Record<string, boolean>>({});
@@ -315,7 +332,7 @@ export const RegistrationSection: React.FC<RegistrationProps> = ({
           const gameName = ev.gameName || game?.name || 'Tournament Event';
           const gameId = ev.gameId || (game ? game.id : gameName.toLowerCase().replace(/[^a-z0-9]/g, '-'));
           const gameSpecificDetails: Record<string, string> = {};
-          let playType = ev.format || game?.format || 'Solo';
+          let playType = (ev.format || game?.format || 'SOLO').toUpperCase();
           let teamName: string | undefined;
           let teamMembers: string | undefined;
 
@@ -323,27 +340,27 @@ export const RegistrationSection: React.FC<RegistrationProps> = ({
           if (gnUpper.includes('FREE FIRE')) {
             gameSpecificDetails['Free Fire UID'] = ffUid || 'N/A';
             gameSpecificDetails['In-Game Name'] = ffIgn || gamerTag;
-            playType = ffPlayType;
-            if (ffPlayType === 'Team / Squad') {
+            if (isTeamFormat(playType)) {
               teamName = ffTeamName;
               teamMembers = ffTeamMembers;
             }
           } else if (gnUpper.includes('BGMI')) {
             gameSpecificDetails['BGMI UID'] = bgmiUid || 'N/A';
             gameSpecificDetails['In-Game Name'] = bgmiIgn || gamerTag;
-            playType = 'Team / Squad';
-            teamName = bgmiTeamName;
-            teamMembers = bgmiTeamMembers;
+            if (isTeamFormat(playType)) {
+              teamName = bgmiTeamName;
+              teamMembers = bgmiTeamMembers;
+            }
           } else if (gnUpper.includes('VALORANT')) {
             gameSpecificDetails['Riot ID'] = valRiotId || gamerTag;
             gameSpecificDetails['Rank'] = valRank;
-            playType = 'Team / Squad';
-            teamName = valTeamName || `${gamerTag}'s 5v5 Squad`;
+            if (isTeamFormat(playType)) {
+              teamName = valTeamName || `${gamerTag}'s Team`;
+            }
           } else if (gnUpper.includes('MINECRAFT')) {
             gameSpecificDetails['Minecraft Username'] = mcUsername || gamerTag;
             gameSpecificDetails['Edition'] = mcEdition;
-            playType = mcPlayType;
-            if (mcPlayType === 'Team / Squad') {
+            if (isTeamFormat(playType)) {
               teamName = mcTeamName;
               teamMembers = mcTeamMembers;
             }
@@ -368,7 +385,7 @@ export const RegistrationSection: React.FC<RegistrationProps> = ({
           const game = dbGames.find(g => g.name === gameName);
           const gameId = game ? game.id : gameName.toLowerCase().replace(/[^a-z0-9]/g, '-');
           const gameSpecificDetails: Record<string, string> = {};
-          let playType = game?.format || 'Solo';
+          let playType = getGameFormat(gameName);
           let teamName: string | undefined;
           let teamMembers: string | undefined;
 
@@ -376,27 +393,27 @@ export const RegistrationSection: React.FC<RegistrationProps> = ({
           if (gnUpper.includes('FREE FIRE')) {
             gameSpecificDetails['Free Fire UID'] = ffUid || 'N/A';
             gameSpecificDetails['In-Game Name'] = ffIgn || gamerTag;
-            playType = ffPlayType;
-            if (ffPlayType === 'Team / Squad') {
+            if (isTeamFormat(playType)) {
               teamName = ffTeamName;
               teamMembers = ffTeamMembers;
             }
           } else if (gnUpper.includes('BGMI')) {
             gameSpecificDetails['BGMI UID'] = bgmiUid || 'N/A';
             gameSpecificDetails['In-Game Name'] = bgmiIgn || gamerTag;
-            playType = 'Team / Squad';
-            teamName = bgmiTeamName;
-            teamMembers = bgmiTeamMembers;
+            if (isTeamFormat(playType)) {
+              teamName = bgmiTeamName;
+              teamMembers = bgmiTeamMembers;
+            }
           } else if (gnUpper.includes('VALORANT')) {
             gameSpecificDetails['Riot ID'] = valRiotId || gamerTag;
             gameSpecificDetails['Rank'] = valRank;
-            playType = 'Team / Squad';
-            teamName = valTeamName || `${gamerTag}'s 5v5 Squad`;
+            if (isTeamFormat(playType)) {
+              teamName = valTeamName || `${gamerTag}'s Team`;
+            }
           } else if (gnUpper.includes('MINECRAFT')) {
             gameSpecificDetails['Minecraft Username'] = mcUsername || gamerTag;
             gameSpecificDetails['Edition'] = mcEdition;
-            playType = mcPlayType;
-            if (mcPlayType === 'Team / Squad') {
+            if (isTeamFormat(playType)) {
               teamName = mcTeamName;
               teamMembers = mcTeamMembers;
             }
@@ -784,357 +801,363 @@ export const RegistrationSection: React.FC<RegistrationProps> = ({
                   </div>
 
                   {/* FREE FIRE SPECIFIC FIELDS */}
-                  {selectedGames.some(g => g.toUpperCase().includes('FREE FIRE')) && (
-                    <div className="p-3 sm:p-3.5 rounded-lg bg-black/40 border border-white/10 space-y-3">
-                      <div className="flex items-center justify-between pb-1.5 border-b border-white/10">
-                        <div className="flex items-center gap-2">
-                          <Flame className="w-3.5 h-3.5 text-[#ff2a2a]" />
-                          <span className="font-tech text-xs uppercase tracking-wider text-[#ff4d4d] font-bold">
-                            FREE FIRE CREDENTIALS
-                          </span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => toggleCardCollapse('FREE FIRE')}
-                          className="text-zinc-500 hover:text-white cursor-pointer"
-                        >
-                          {collapsedCards['FREE FIRE'] ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
-                        </button>
-                      </div>
-
-                      {!collapsedCards['FREE FIRE'] && (
-                        <div className="space-y-3 animate-in fade-in duration-200">
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                            <div>
-                              <label className="block text-[11px] font-tech text-zinc-300 uppercase tracking-wider mb-1 font-semibold">
-                                Free Fire UID <span className="text-[#ff2a2a]">*</span>
-                              </label>
-                              <input
-                                required
-                                type="text"
-                                placeholder="e.g. 192837465"
-                                value={ffUid}
-                                onChange={e => setFfUid(e.target.value)}
-                                className="w-full px-2.5 py-1.5 bg-black/60 border border-white/10 rounded font-tech text-base sm:text-xs text-white focus:outline-none focus:border-red-500"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-[11px] font-tech text-zinc-300 uppercase tracking-wider mb-1 font-semibold">
-                                In-Game Name (IGN) <span className="text-[#ff2a2a]">*</span>
-                              </label>
-                              <input
-                                required
-                                type="text"
-                                placeholder="Exact in-game name"
-                                value={ffIgn}
-                                onChange={e => setFfIgn(e.target.value)}
-                                className="w-full px-2.5 py-1.5 bg-black/60 border border-white/10 rounded font-tech text-base sm:text-xs text-white focus:outline-none focus:border-red-500"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-[11px] font-tech text-zinc-300 uppercase tracking-wider mb-1 font-semibold">
-                                Format <span className="text-[#ff2a2a]">*</span>
-                              </label>
-                              <select
-                                value={ffPlayType}
-                                onChange={e => setFfPlayType(e.target.value as 'Solo' | 'Team / Squad')}
-                                className="w-full px-2.5 py-1.5 bg-black/60 border border-white/10 rounded font-tech text-base sm:text-xs text-white focus:outline-none focus:border-red-500"
-                              >
-                                <option value="Solo">Solo</option>
-                                <option value="Team / Squad">Team / Squad</option>
-                              </select>
-                            </div>
+                  {selectedGames.some(g => g.toUpperCase().includes('FREE FIRE')) && (() => {
+                    const ffFormat = getGameFormat('FREE FIRE');
+                    const isTeam = isTeamFormat(ffFormat);
+                    return (
+                      <div className="p-3 sm:p-3.5 rounded-lg bg-black/40 border border-white/10 space-y-3">
+                        <div className="flex items-center justify-between pb-1.5 border-b border-white/10">
+                          <div className="flex items-center gap-2">
+                            <Flame className="w-3.5 h-3.5 text-[#ff2a2a]" />
+                            <span className="font-tech text-xs uppercase tracking-wider text-[#ff4d4d] font-bold">
+                              FREE FIRE CREDENTIALS
+                            </span>
+                            <span className="text-[10px] px-2 py-0.5 rounded bg-red-950/70 border border-red-500/30 text-[#ff4d4d] font-tech font-bold uppercase">
+                              FORMAT: {ffFormat}
+                            </span>
                           </div>
+                          <button
+                            type="button"
+                            onClick={() => toggleCardCollapse('FREE FIRE')}
+                            className="text-zinc-500 hover:text-white cursor-pointer"
+                          >
+                            {collapsedCards['FREE FIRE'] ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
 
-                          {ffPlayType === 'Team / Squad' && (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2 border-t border-white/5">
+                        {!collapsedCards['FREE FIRE'] && (
+                          <div className="space-y-3 animate-in fade-in duration-200">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                               <div>
                                 <label className="block text-[11px] font-tech text-zinc-300 uppercase tracking-wider mb-1 font-semibold">
-                                  Team Name <span className="text-[#ff2a2a]">*</span>
+                                  Free Fire UID <span className="text-[#ff2a2a]">*</span>
                                 </label>
                                 <input
                                   required
                                   type="text"
-                                  placeholder="e.g. Team Phoenix"
-                                  value={ffTeamName}
-                                  onChange={e => setFfTeamName(e.target.value)}
+                                  placeholder="e.g. 192837465"
+                                  value={ffUid}
+                                  onChange={e => setFfUid(e.target.value)}
                                   className="w-full px-2.5 py-1.5 bg-black/60 border border-white/10 rounded font-tech text-base sm:text-xs text-white focus:outline-none focus:border-red-500"
                                 />
                               </div>
                               <div>
                                 <label className="block text-[11px] font-tech text-zinc-300 uppercase tracking-wider mb-1 font-semibold">
-                                  Team Members <span className="text-[#ff2a2a]">*</span>
+                                  In-Game Name (IGN) <span className="text-[#ff2a2a]">*</span>
                                 </label>
                                 <input
                                   required
                                   type="text"
-                                  placeholder="Player2, Player3, Player4"
-                                  value={ffTeamMembers}
-                                  onChange={e => setFfTeamMembers(e.target.value)}
+                                  placeholder="Exact in-game name"
+                                  value={ffIgn}
+                                  onChange={e => setFfIgn(e.target.value)}
                                   className="w-full px-2.5 py-1.5 bg-black/60 border border-white/10 rounded font-tech text-base sm:text-xs text-white focus:outline-none focus:border-red-500"
                                 />
                               </div>
                             </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
+
+                            {isTeam && (
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2 border-t border-white/5">
+                                <div>
+                                  <label className="block text-[11px] font-tech text-zinc-300 uppercase tracking-wider mb-1 font-semibold">
+                                    Team / Squad Name <span className="text-[#ff2a2a]">*</span>
+                                  </label>
+                                  <input
+                                    required
+                                    type="text"
+                                    placeholder="e.g. Team Phoenix"
+                                    value={ffTeamName}
+                                    onChange={e => setFfTeamName(e.target.value)}
+                                    className="w-full px-2.5 py-1.5 bg-black/60 border border-white/10 rounded font-tech text-base sm:text-xs text-white focus:outline-none focus:border-red-500"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-[11px] font-tech text-zinc-300 uppercase tracking-wider mb-1 font-semibold">
+                                    Lineup / Teammates <span className="text-[#ff2a2a]">*</span>
+                                  </label>
+                                  <input
+                                    required
+                                    type="text"
+                                    placeholder="Player2, Player3, Player4"
+                                    value={ffTeamMembers}
+                                    onChange={e => setFfTeamMembers(e.target.value)}
+                                    className="w-full px-2.5 py-1.5 bg-black/60 border border-white/10 rounded font-tech text-base sm:text-xs text-white focus:outline-none focus:border-red-500"
+                                  />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   {/* BGMI SPECIFIC FIELDS */}
-                  {selectedGames.some(g => g.toUpperCase().includes('BGMI')) && (
-                    <div className="p-3 sm:p-3.5 rounded-lg bg-black/40 border border-white/10 space-y-3">
-                      <div className="flex items-center justify-between pb-1.5 border-b border-white/10">
-                        <div className="flex items-center gap-2">
-                          <Crosshair className="w-3.5 h-3.5 text-[#ff2a2a]" />
-                          <span className="font-tech text-xs uppercase tracking-wider text-[#ff4d4d] font-bold">
-                            BGMI CREDENTIALS
-                          </span>
+                  {selectedGames.some(g => g.toUpperCase().includes('BGMI')) && (() => {
+                    const bgmiFormat = getGameFormat('BGMI');
+                    const isTeam = isTeamFormat(bgmiFormat);
+                    return (
+                      <div className="p-3 sm:p-3.5 rounded-lg bg-black/40 border border-white/10 space-y-3">
+                        <div className="flex items-center justify-between pb-1.5 border-b border-white/10">
+                          <div className="flex items-center gap-2">
+                            <Crosshair className="w-3.5 h-3.5 text-[#ff2a2a]" />
+                            <span className="font-tech text-xs uppercase tracking-wider text-[#ff4d4d] font-bold">
+                              BGMI CREDENTIALS
+                            </span>
+                            <span className="text-[10px] px-2 py-0.5 rounded bg-red-950/70 border border-red-500/30 text-[#ff4d4d] font-tech font-bold uppercase">
+                              FORMAT: {bgmiFormat}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => toggleCardCollapse('BGMI')}
+                            className="text-zinc-500 hover:text-white cursor-pointer"
+                          >
+                            {collapsedCards['BGMI'] ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
+                          </button>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => toggleCardCollapse('BGMI')}
-                          className="text-zinc-500 hover:text-white cursor-pointer"
-                        >
-                          {collapsedCards['BGMI'] ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
-                        </button>
+
+                        {!collapsedCards['BGMI'] && (
+                          <div className="space-y-3 animate-in fade-in duration-200">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                              <div>
+                                <label className="block text-[11px] font-tech text-zinc-300 uppercase tracking-wider mb-1 font-semibold">
+                                  Character ID <span className="text-[#ff2a2a]">*</span>
+                                </label>
+                                <input
+                                  required
+                                  type="text"
+                                  placeholder="e.g. 5182930412"
+                                  value={bgmiUid}
+                                  onChange={e => setBgmiUid(e.target.value)}
+                                  className="w-full px-2.5 py-1.5 bg-black/60 border border-white/10 rounded font-tech text-base sm:text-xs text-white focus:outline-none focus:border-red-500"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[11px] font-tech text-zinc-300 uppercase tracking-wider mb-1 font-semibold">
+                                  In-Game Name (IGN) <span className="text-[#ff2a2a]">*</span>
+                                </label>
+                                <input
+                                  required
+                                  type="text"
+                                  placeholder="Exact IGN"
+                                  value={bgmiIgn}
+                                  onChange={e => setBgmiIgn(e.target.value)}
+                                  className="w-full px-2.5 py-1.5 bg-black/60 border border-white/10 rounded font-tech text-base sm:text-xs text-white focus:outline-none focus:border-red-500"
+                                />
+                              </div>
+                            </div>
+
+                            {isTeam && (
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2 border-t border-white/5">
+                                <div>
+                                  <label className="block text-[11px] font-tech text-zinc-300 uppercase tracking-wider mb-1 font-semibold">
+                                    Squad / Team Name <span className="text-[#ff2a2a]">*</span>
+                                  </label>
+                                  <input
+                                    required
+                                    type="text"
+                                    placeholder="e.g. Mortal Clan"
+                                    value={bgmiTeamName}
+                                    onChange={e => setBgmiTeamName(e.target.value)}
+                                    className="w-full px-2.5 py-1.5 bg-black/60 border border-white/10 rounded font-tech text-base sm:text-xs text-white focus:outline-none focus:border-red-500"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-[11px] font-tech text-zinc-300 uppercase tracking-wider mb-1 font-semibold">
+                                    Lineup ({bgmiFormat.includes('DUO') ? '2 Players' : '4 Players'}) <span className="text-[#ff2a2a]">*</span>
+                                  </label>
+                                  <input
+                                    required
+                                    type="text"
+                                    placeholder="Player1, Player2, Player3, Player4"
+                                    value={bgmiTeamMembers}
+                                    onChange={e => setBgmiTeamMembers(e.target.value)}
+                                    className="w-full px-2.5 py-1.5 bg-black/60 border border-white/10 rounded font-tech text-base sm:text-xs text-white focus:outline-none focus:border-red-500"
+                                  />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
-
-                      {!collapsedCards['BGMI'] && (
-                        <div className="space-y-3 animate-in fade-in duration-200">
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                            <div>
-                              <label className="block text-[11px] font-tech text-zinc-300 uppercase tracking-wider mb-1 font-semibold">
-                                Character ID <span className="text-[#ff2a2a]">*</span>
-                              </label>
-                              <input
-                                required
-                                type="text"
-                                placeholder="e.g. 5182930412"
-                                value={bgmiUid}
-                                onChange={e => setBgmiUid(e.target.value)}
-                                className="w-full px-2.5 py-1.5 bg-black/60 border border-white/10 rounded font-tech text-base sm:text-xs text-white focus:outline-none focus:border-red-500"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-[11px] font-tech text-zinc-300 uppercase tracking-wider mb-1 font-semibold">
-                                In-Game Name (IGN) <span className="text-[#ff2a2a]">*</span>
-                              </label>
-                              <input
-                                required
-                                type="text"
-                                placeholder="Exact IGN"
-                                value={bgmiIgn}
-                                onChange={e => setBgmiIgn(e.target.value)}
-                                className="w-full px-2.5 py-1.5 bg-black/60 border border-white/10 rounded font-tech text-base sm:text-xs text-white focus:outline-none focus:border-red-500"
-                              />
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2 border-t border-white/5">
-                            <div>
-                              <label className="block text-[11px] font-tech text-zinc-300 uppercase tracking-wider mb-1 font-semibold">
-                                Squad / Team Name <span className="text-[#ff2a2a]">*</span>
-                              </label>
-                              <input
-                                required
-                                type="text"
-                                placeholder="e.g. Mortal Clan"
-                                value={bgmiTeamName}
-                                onChange={e => setBgmiTeamName(e.target.value)}
-                                className="w-full px-2.5 py-1.5 bg-black/60 border border-white/10 rounded font-tech text-base sm:text-xs text-white focus:outline-none focus:border-red-500"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-[11px] font-tech text-zinc-300 uppercase tracking-wider mb-1 font-semibold">
-                                Squad Lineup (4 Players) <span className="text-[#ff2a2a]">*</span>
-                              </label>
-                              <input
-                                required
-                                type="text"
-                                placeholder="Player1, Player2, Player3, Player4"
-                                value={bgmiTeamMembers}
-                                onChange={e => setBgmiTeamMembers(e.target.value)}
-                                className="w-full px-2.5 py-1.5 bg-black/60 border border-white/10 rounded font-tech text-base sm:text-xs text-white focus:outline-none focus:border-red-500"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                    );
+                  })()}
 
                   {/* VALORANT SPECIFIC FIELDS */}
-                  {selectedGames.some(g => g.toUpperCase().includes('VALORANT')) && (
-                    <div className="p-3 sm:p-3.5 rounded-lg bg-black/40 border border-white/10 space-y-3">
-                      <div className="flex items-center justify-between pb-1.5 border-b border-white/10">
-                        <div className="flex items-center gap-2">
-                          <Crosshair className="w-3.5 h-3.5 text-[#D71920]" />
-                          <span className="font-tech text-xs uppercase tracking-wider text-[#ff4d4d] font-bold">
-                            VALORANT 5v5 CREDENTIALS
-                          </span>
+                  {selectedGames.some(g => g.toUpperCase().includes('VALORANT')) && (() => {
+                    const valFormat = getGameFormat('VALORANT');
+                    const isTeam = isTeamFormat(valFormat);
+                    return (
+                      <div className="p-3 sm:p-3.5 rounded-lg bg-black/40 border border-white/10 space-y-3">
+                        <div className="flex items-center justify-between pb-1.5 border-b border-white/10">
+                          <div className="flex items-center gap-2">
+                            <Crosshair className="w-3.5 h-3.5 text-[#D71920]" />
+                            <span className="font-tech text-xs uppercase tracking-wider text-[#ff4d4d] font-bold">
+                              VALORANT CREDENTIALS
+                            </span>
+                            <span className="text-[10px] px-2 py-0.5 rounded bg-red-950/70 border border-red-500/30 text-[#ff4d4d] font-tech font-bold uppercase">
+                              FORMAT: {valFormat}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => toggleCardCollapse('VALORANT')}
+                            className="text-zinc-500 hover:text-white cursor-pointer"
+                          >
+                            {collapsedCards['VALORANT'] ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
+                          </button>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => toggleCardCollapse('VALORANT')}
-                          className="text-zinc-500 hover:text-white cursor-pointer"
-                        >
-                          {collapsedCards['VALORANT'] ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
-                        </button>
-                      </div>
 
-                      {!collapsedCards['VALORANT'] && (
-                        <div className="space-y-3 animate-in fade-in duration-200">
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                            <div>
-                              <label className="block text-[11px] font-tech text-zinc-300 uppercase tracking-wider mb-1 font-semibold">
-                                Riot ID & Tagline <span className="text-[#ff2a2a]">*</span>
-                              </label>
-                              <input
-                                required
-                                type="text"
-                                placeholder="e.g. TenZ#1337"
-                                value={valRiotId}
-                                onChange={e => setValRiotId(e.target.value)}
-                                className="w-full px-2.5 py-1.5 bg-black/60 border border-white/10 rounded font-tech text-base sm:text-xs text-white focus:outline-none focus:border-red-500"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-[11px] font-tech text-zinc-300 uppercase tracking-wider mb-1 font-semibold">
-                                Peak Rank <span className="text-[#ff2a2a]">*</span>
-                              </label>
-                              <select
-                                value={valRank}
-                                onChange={e => setValRank(e.target.value)}
-                                className="w-full px-2.5 py-1.5 bg-black/60 border border-white/10 rounded font-tech text-base sm:text-xs text-white focus:outline-none focus:border-red-500"
-                              >
-                                <option value="Iron">Iron</option>
-                                <option value="Bronze">Bronze</option>
-                                <option value="Silver">Silver</option>
-                                <option value="Gold">Gold</option>
-                                <option value="Platinum">Platinum</option>
-                                <option value="Diamond">Diamond</option>
-                                <option value="Ascendant">Ascendant</option>
-                                <option value="Immortal">Immortal</option>
-                                <option value="Radiant">Radiant</option>
-                              </select>
-                            </div>
-                            <div>
-                              <label className="block text-[11px] font-tech text-zinc-300 uppercase tracking-wider mb-1 font-semibold">
-                                5v5 Team Name <span className="text-[#ff2a2a]">*</span>
-                              </label>
-                              <input
-                                required
-                                type="text"
-                                placeholder="e.g. Sentinels India"
-                                value={valTeamName}
-                                onChange={e => setValTeamName(e.target.value)}
-                                className="w-full px-2.5 py-1.5 bg-black/60 border border-white/10 rounded font-tech text-base sm:text-xs text-white focus:outline-none focus:border-red-500"
-                              />
+                        {!collapsedCards['VALORANT'] && (
+                          <div className="space-y-3 animate-in fade-in duration-200">
+                            <div className={`grid grid-cols-1 ${isTeam ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} gap-2.5`}>
+                              <div>
+                                <label className="block text-[11px] font-tech text-zinc-300 uppercase tracking-wider mb-1 font-semibold">
+                                  Riot ID & Tagline <span className="text-[#ff2a2a]">*</span>
+                                </label>
+                                <input
+                                  required
+                                  type="text"
+                                  placeholder="e.g. TenZ#1337"
+                                  value={valRiotId}
+                                  onChange={e => setValRiotId(e.target.value)}
+                                  className="w-full px-2.5 py-1.5 bg-black/60 border border-white/10 rounded font-tech text-base sm:text-xs text-white focus:outline-none focus:border-red-500"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[11px] font-tech text-zinc-300 uppercase tracking-wider mb-1 font-semibold">
+                                  Peak Rank <span className="text-[#ff2a2a]">*</span>
+                                </label>
+                                <select
+                                  value={valRank}
+                                  onChange={e => setValRank(e.target.value)}
+                                  className="w-full px-2.5 py-1.5 bg-black/60 border border-white/10 rounded font-tech text-base sm:text-xs text-white focus:outline-none focus:border-red-500"
+                                >
+                                  <option value="Iron">Iron</option>
+                                  <option value="Bronze">Bronze</option>
+                                  <option value="Silver">Silver</option>
+                                  <option value="Gold">Gold</option>
+                                  <option value="Platinum">Platinum</option>
+                                  <option value="Diamond">Diamond</option>
+                                  <option value="Ascendant">Ascendant</option>
+                                  <option value="Immortal">Immortal</option>
+                                  <option value="Radiant">Radiant</option>
+                                </select>
+                              </div>
+                              {isTeam && (
+                                <div>
+                                  <label className="block text-[11px] font-tech text-zinc-300 uppercase tracking-wider mb-1 font-semibold">
+                                    Team Name <span className="text-[#ff2a2a]">*</span>
+                                  </label>
+                                  <input
+                                    required
+                                    type="text"
+                                    placeholder="e.g. Sentinels India"
+                                    value={valTeamName}
+                                    onChange={e => setValTeamName(e.target.value)}
+                                    className="w-full px-2.5 py-1.5 bg-black/60 border border-white/10 rounded font-tech text-base sm:text-xs text-white focus:outline-none focus:border-red-500"
+                                  />
+                                </div>
+                              )}
                             </div>
                           </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   {/* MINECRAFT SPECIFIC FIELDS */}
-                  {selectedGames.some(g => g.toUpperCase().includes('MINECRAFT')) && (
-                    <div className="p-3 sm:p-3.5 rounded-lg bg-black/40 border border-white/10 space-y-3">
-                      <div className="flex items-center justify-between pb-1.5 border-b border-white/10">
-                        <div className="flex items-center gap-2">
-                          <ShieldAlert className="w-3.5 h-3.5 text-[#ff2a2a]" />
-                          <span className="font-tech text-xs uppercase tracking-wider text-[#ff4d4d] font-bold">
-                            MINECRAFT CREDENTIALS
-                          </span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => toggleCardCollapse('MINECRAFT')}
-                          className="text-zinc-500 hover:text-white cursor-pointer"
-                        >
-                          {collapsedCards['MINECRAFT'] ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
-                        </button>
-                      </div>
-
-                      {!collapsedCards['MINECRAFT'] && (
-                        <div className="space-y-3 animate-in fade-in duration-200">
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                            <div>
-                              <label className="block text-[11px] font-tech text-zinc-300 uppercase tracking-wider mb-1 font-semibold">
-                                Minecraft IGN <span className="text-[#ff2a2a]">*</span>
-                              </label>
-                              <input
-                                required
-                                type="text"
-                                placeholder="Java or Bedrock username"
-                                value={mcUsername}
-                                onChange={e => setMcUsername(e.target.value)}
-                                className="w-full px-2.5 py-1.5 bg-black/60 border border-white/10 rounded font-tech text-base sm:text-xs text-white focus:outline-none focus:border-red-500"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-[11px] font-tech text-zinc-300 uppercase tracking-wider mb-1 font-semibold">
-                                Edition <span className="text-[#ff2a2a]">*</span>
-                              </label>
-                              <select
-                                value={mcEdition}
-                                onChange={e => setMcEdition(e.target.value as 'Java' | 'Bedrock')}
-                                className="w-full px-2.5 py-1.5 bg-black/60 border border-white/10 rounded font-tech text-base sm:text-xs text-white focus:outline-none focus:border-red-500"
-                              >
-                                <option value="Java">Java Edition (1.20+)</option>
-                                <option value="Bedrock">Bedrock Edition</option>
-                              </select>
-                            </div>
-                            <div>
-                              <label className="block text-[11px] font-tech text-zinc-300 uppercase tracking-wider mb-1 font-semibold">
-                                Format <span className="text-[#ff2a2a]">*</span>
-                              </label>
-                              <select
-                                value={mcPlayType}
-                                onChange={e => setMcPlayType(e.target.value as 'Solo' | 'Team / Squad')}
-                                className="w-full px-2.5 py-1.5 bg-black/60 border border-white/10 rounded font-tech text-base sm:text-xs text-white focus:outline-none focus:border-red-500"
-                              >
-                                <option value="Solo">Solo (Build Battle & PvP)</option>
-                                <option value="Team / Squad">Duo / Squad</option>
-                              </select>
-                            </div>
+                  {selectedGames.some(g => g.toUpperCase().includes('MINECRAFT')) && (() => {
+                    const mcFormat = getGameFormat('MINECRAFT');
+                    const isTeam = isTeamFormat(mcFormat);
+                    return (
+                      <div className="p-3 sm:p-3.5 rounded-lg bg-black/40 border border-white/10 space-y-3">
+                        <div className="flex items-center justify-between pb-1.5 border-b border-white/10">
+                          <div className="flex items-center gap-2">
+                            <ShieldAlert className="w-3.5 h-3.5 text-[#ff2a2a]" />
+                            <span className="font-tech text-xs uppercase tracking-wider text-[#ff4d4d] font-bold">
+                              MINECRAFT CREDENTIALS
+                            </span>
+                            <span className="text-[10px] px-2 py-0.5 rounded bg-red-950/70 border border-red-500/30 text-[#ff4d4d] font-tech font-bold uppercase">
+                              FORMAT: {mcFormat}
+                            </span>
                           </div>
+                          <button
+                            type="button"
+                            onClick={() => toggleCardCollapse('MINECRAFT')}
+                            className="text-zinc-500 hover:text-white cursor-pointer"
+                          >
+                            {collapsedCards['MINECRAFT'] ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
 
-                          {mcPlayType === 'Team / Squad' && (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2 border-t border-white/5">
+                        {!collapsedCards['MINECRAFT'] && (
+                          <div className="space-y-3 animate-in fade-in duration-200">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                               <div>
                                 <label className="block text-[11px] font-tech text-zinc-300 uppercase tracking-wider mb-1 font-semibold">
-                                  Duo/Squad Name <span className="text-[#ff2a2a]">*</span>
+                                  Minecraft IGN <span className="text-[#ff2a2a]">*</span>
                                 </label>
                                 <input
                                   required
                                   type="text"
-                                  placeholder="e.g. BlockBusters"
-                                  value={mcTeamName}
-                                  onChange={e => setMcTeamName(e.target.value)}
+                                  placeholder="Java or Bedrock username"
+                                  value={mcUsername}
+                                  onChange={e => setMcUsername(e.target.value)}
                                   className="w-full px-2.5 py-1.5 bg-black/60 border border-white/10 rounded font-tech text-base sm:text-xs text-white focus:outline-none focus:border-red-500"
                                 />
                               </div>
                               <div>
                                 <label className="block text-[11px] font-tech text-zinc-300 uppercase tracking-wider mb-1 font-semibold">
-                                  Teammates <span className="text-[#ff2a2a]">*</span>
+                                  Edition <span className="text-[#ff2a2a]">*</span>
                                 </label>
-                                <input
-                                  required
-                                  type="text"
-                                  placeholder="Teammate MC Usernames"
-                                  value={mcTeamMembers}
-                                  onChange={e => setMcTeamMembers(e.target.value)}
+                                <select
+                                  value={mcEdition}
+                                  onChange={e => setMcEdition(e.target.value as 'Java' | 'Bedrock')}
                                   className="w-full px-2.5 py-1.5 bg-black/60 border border-white/10 rounded font-tech text-base sm:text-xs text-white focus:outline-none focus:border-red-500"
-                                />
+                                >
+                                  <option value="Java">Java Edition (1.20+)</option>
+                                  <option value="Bedrock">Bedrock Edition</option>
+                                </select>
                               </div>
                             </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
+
+                            {isTeam && (
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2 border-t border-white/5">
+                                <div>
+                                  <label className="block text-[11px] font-tech text-zinc-300 uppercase tracking-wider mb-1 font-semibold">
+                                    Team / Duo Name <span className="text-[#ff2a2a]">*</span>
+                                  </label>
+                                  <input
+                                    required
+                                    type="text"
+                                    placeholder="e.g. BlockBusters"
+                                    value={mcTeamName}
+                                    onChange={e => setMcTeamName(e.target.value)}
+                                    className="w-full px-2.5 py-1.5 bg-black/60 border border-white/10 rounded font-tech text-base sm:text-xs text-white focus:outline-none focus:border-red-500"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-[11px] font-tech text-zinc-300 uppercase tracking-wider mb-1 font-semibold">
+                                    Teammates <span className="text-[#ff2a2a]">*</span>
+                                  </label>
+                                  <input
+                                    required
+                                    type="text"
+                                    placeholder="Teammate MC Usernames"
+                                    value={mcTeamMembers}
+                                    onChange={e => setMcTeamMembers(e.target.value)}
+                                    className="w-full px-2.5 py-1.5 bg-black/60 border border-white/10 rounded font-tech text-base sm:text-xs text-white focus:outline-none focus:border-red-500"
+                                  />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                 </div>
               )}
