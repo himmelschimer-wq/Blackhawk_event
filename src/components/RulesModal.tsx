@@ -68,10 +68,10 @@ export const RulesModal: React.FC<RulesModalProps> = ({ isOpen, onClose }) => {
           <div className="space-y-2 border-b border-white/[0.06] pb-4">
             <h4 className="font-cinzel text-white text-base font-semibold flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-[#D71920]" />
-              2. CHECK-IN & ROOM ID DISTRIBUTION
+              2. CHECK-IN &amp; ROOM ID DISTRIBUTION
             </h4>
             <p>
-              Room ID and Password are sent via our official Discord server and WhatsApp/email notification 15 minutes prior to match schedule. Players failing to join within 10 minutes will forfeit their slot.
+              Room ID and Password are <strong className="text-white">ONLY shared on our official Discord server</strong>. There is no other way (no email, SMS, or WhatsApp). Players failing to join the custom room within the allocated time will forfeit their slot.
             </p>
           </div>
 
@@ -79,20 +79,21 @@ export const RulesModal: React.FC<RulesModalProps> = ({ isOpen, onClose }) => {
           <div className="space-y-2 border-b border-white/[0.06] pb-4">
             <h4 className="font-cinzel text-white text-base font-semibold flex items-center gap-2">
               <Award className="w-4 h-4 text-[#D71920]" />
-              3. PRIZE DISBURSEMENT
+              3. PRIZE POOL &amp; DISTRIBUTION
             </h4>
             <p>
-              All prizes (₹50,000+ total league prize pool) will be transferred directly to winners via instant UPI or Bank Transfer within 2 hours of official result verification and screenshot audit.
+              Prize distribution is determined per tournament based on the prize pool and will be explicitly detailed in each tournament&apos;s specific event rules and briefing. Payouts are transferred directly to verified winners via UPI / Bank Transfer following result confirmation.
             </p>
           </div>
 
           {/* Section 4 */}
           <div className="space-y-2">
-            <h4 className="font-cinzel text-white text-base font-semibold">
-              4. RECORDING & EVIDENCE
+            <h4 className="font-cinzel text-white text-base font-semibold flex items-center gap-2">
+              <ShieldAlert className="w-4 h-4 text-[#D71920]" />
+              4. RECORDINGS &amp; ADMIN FINAL DECISIONS
             </h4>
             <p>
-              Top 3 players or squads in every tournament may be requested to provide continuous POV screen recording or death cam footage in case of dispute.
+              It is not mandatory for players to provide match screen recordings. However, tournament admins and event managers hold full authority and will make the final decisions and conclusions regarding all match outcomes, disputes, and rule interpretations.
             </p>
           </div>
         </div>

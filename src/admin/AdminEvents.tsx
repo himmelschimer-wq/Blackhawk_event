@@ -21,88 +21,90 @@ const GAME_RULE_PRESETS: Record<string, { rules: string; generalRules: string; f
   bgmi: {
     format: 'SQUAD',
     rules: [
-      '1. Custom Room ID & Password shared on Discord 15 minutes before match start.',
+      '1. Custom Room ID & Password shared ONLY on Discord (no other way) 15 minutes before match start.',
       '2. Mobile devices only (Smartphones). Emulators, iPad view mods, and physical trigger accessories are strictly forbidden.',
       '3. Official Maps: Erangel (Match 1) & Miramar (Match 2). Standard competitive circle shrink times.',
       '4. Scoring: 1st Place: 10 pts, 2nd: 6 pts, 3rd: 5 pts, 4th: 4 pts, 5th: 3 pts, 6th: 2 pts, 7th-8th: 1 pt. Kill Point: 1 pt per kill.',
-      '5. Team Captain must submit clear end-screen scoreboard screenshot in #match-results within 15 mins.'
+      '5. Team Captain must submit clear end-screen scoreboard screenshot in #match-results within 15 mins (recordings not mandatory).'
     ].join('\n'),
     generalRules: [
-      '1. Discord check-in mandatory for all 4 team members 30 minutes prior.',
+      '1. Discord check-in mandatory for all team members 30 minutes prior.',
       '2. Strict zero-tolerance policy against teaming, stream sniping, or verbal abuse.',
-      '3. Prize pool payout dispatched via UPI / Bank Transfer within 24-48 hours after admin verification.'
+      '3. Screen recording is not mandatory for players; Tournament Admins & Event Managers take final conclusions on all match results and disputes.',
+      '4. Prize pool distribution is awarded according to specific event rules and dispatched via UPI / Bank Transfer.'
     ].join('\n')
   },
   'free-fire': {
     format: 'SOLO / SQUAD',
     rules: [
-      '1. Classic Battle Royale / Clash Squad custom room mode.',
-      '2. Character Skills: ACTIVE. Gun Attributes: OFF (Competitive Standard). Limited Ammo: YES.',
-      '3. Mobile devices only. Emulators or third-party sensitivity scripts result in immediate disqualification.',
-      '4. Point System: 1st Place (Booyah): 12 pts, 2nd: 9 pts, 3rd: 8 pts, 4th: 7 pts. Kill Point: 1 pt per kill.',
-      '5. Screen recording / screenshot of final match results is compulsory for verification.'
+      '1. Custom Room ID & Password shared ONLY on official Discord (no other way) 15 minutes prior to match start.',
+      '2. Classic Battle Royale / Clash Squad custom room mode.',
+      '3. Character Skills: ACTIVE. Gun Attributes: OFF (Competitive Standard). Limited Ammo: YES.',
+      '4. Mobile devices only. Emulators or third-party sensitivity scripts result in immediate disqualification.',
+      '5. Point System: 1st Place (Booyah): 12 pts, 2nd: 9 pts, 3rd: 8 pts, 4th: 7 pts. Kill Point: 1 pt per kill.',
+      '6. Submit screenshot of final match scoreboard for verification (continuous recording not mandatory).'
     ].join('\n'),
     generalRules: [
       '1. Accurate In-Game UID and IGN must match your registration form exactly.',
-      '2. Unsportsmanlike conduct or lobby toxicity will lead to blacklisting from future BlackHawk seasons.',
-      '3. Payouts processed directly to winners via verified UPI.'
+      '2. Tournament Admins and Event Managers hold full authority to make final decisions on all disputes.',
+      '3. Prize pool distribution is awarded according to event rules via verified UPI.'
     ].join('\n')
   },
   valorant: {
     format: '5v5',
     rules: [
-      '1. Mode: Standard 5v5 Custom Game (Tournament Mode: ON, Overtime: Win by Two).',
-      '2. Map Pool: Ascent, Bind, Haven, Split, Lotus, Sunset, Abyss. Map veto done in Discord prior to match.',
-      '3. Tactical Pauses: 1 tactical timeout allowed per half (60 seconds each).',
-      '4. Anti-Cheat: Riot Vanguard must remain active with zero exceptions.',
-      '5. Both team captains must record match VODs and upload post-match summary screenshots.'
+      '1. Custom Lobby details shared ONLY on official Discord (no other way).',
+      '2. Mode: Standard 5v5 Custom Game (Tournament Mode: ON, Overtime: Win by Two).',
+      '3. Map Pool: Ascent, Bind, Haven, Split, Lotus, Sunset, Abyss. Map veto done in Discord prior to match.',
+      '4. Tactical Pauses: 1 tactical timeout allowed per half (60 seconds each). Riot Vanguard must remain active.',
+      '5. Team captains must upload post-match summary screenshots (VOD recording is optional for players).'
     ].join('\n'),
     generalRules: [
       '1. All players must be in the designated BlackHawk Discord voice channels during match play.',
-      '2. Substitutions must be declared at least 1 hour before scheduled match time.',
-      '3. Official prize disbursement within 48 hours post-tournament.'
+      '2. Tournament Admins and Event Managers take final conclusions on match outcomes and disputes.',
+      '3. Prize pool distribution as specified in event rules, disbursed within 48 hours post-verification.'
     ].join('\n')
   },
   minecraft: {
     format: 'SOLO / TEAM',
     rules: [
-      '1. Server Version: Java 1.20.x / Bedrock compatible server ip sent to confirmed participants.',
+      '1. Server IP & connection details shared ONLY on official Discord (no other way).',
       '2. Game Mode: Bedwars / Speedrun Challenge / Survival Games as specified in bracket.',
       '3. Prohibited: X-ray texture packs, hacked clients (Meteor, Aristois, etc.), auto-clickers (>15 CPS).',
-      '4. Replay recording enabled on server for automated anti-cheat review.',
-      '5. Final placement determined by in-game leaderboards and server logging.'
+      '4. Final placement determined by in-game leaderboards and server logging (screen recording not mandatory for players).'
     ].join('\n'),
     generalRules: [
       '1. Player IGN must match the registered Minecraft handle.',
-      '2. Respectful communication in Discord and in-game chat required at all times.',
-      '3. Cash prize transferred via UPI within 24 hours of match completion.'
+      '2. Tournament Admins & Event Managers make final conclusions on all match decisions.',
+      '3. Prize pool distributed according to specific event rules via UPI.'
     ].join('\n')
   },
   chess: {
     format: 'SOLO',
     rules: [
-      '1. Platform: Chess.com / Lichess.org official tournament arena link.',
+      '1. Platform: Chess.com / Lichess.org official tournament arena link shared ONLY on Discord.',
       '2. Time Control: 3+2 Blitz or 5+0 Rapid as scheduled.',
-      '3. Anti-Cheating: Automated engine analysis (Stockfish evaluation) performed on all games. Any match with >95% engine accuracy is subject to manual grandmaster review.',
+      '3. Anti-Cheating: Automated engine analysis performed on all games.',
       '4. Disconnections: Player is responsible for their own internet stability.'
     ].join('\n'),
     generalRules: [
       '1. Account must be at least 30 days old and have verified rating history.',
-      '2. Instant disqualification and ban for using chess engines or secondary devices.',
-      '3. Instant payout directly following fair-play review.'
+      '2. Admins and Event Managers make final conclusions regarding disputes and fair play.',
+      '3. Prize pool distributed according to event rules directly following review.'
     ].join('\n')
   },
   scribble: {
     format: 'SOLO',
     rules: [
-      '1. Private Skribbl.io custom room lobby link sent 5 minutes prior to match.',
+      '1. Private Skribbl.io custom room lobby link sent ONLY on Discord 5 minutes prior to match.',
       '2. Drawing Time: 80 Seconds per round. Custom words list enabled.',
       '3. Strictly forbidden: Writing words or spelling out answers directly on canvas.',
       '4. Highest cumulative points at the end of all rounds takes the crown.'
     ].join('\n'),
     generalRules: [
       '1. Keep drawing and chat family-friendly and respectful.',
-      '2. Prizes distributed immediately post-session.'
+      '2. Admins and Event Managers hold final decision on any disputed answers.',
+      '3. Prizes distributed according to event rules immediately post-session.'
     ].join('\n')
   }
 };

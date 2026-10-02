@@ -81,8 +81,6 @@ export const TOURNAMENT_CONFIG = {
   contactEmail: "contact@blackhawkteam.gg",
   socials: {
     discord: "https://discord.gg/WrxHsKbHY",
-    instagram: "#",
-    youtube: "#",
   }
 };
 
@@ -394,7 +392,7 @@ export const RULES_DATA: RuleCategory[] = [
     content: [
       "All competitors must maintain a respectful sporting attitude at all times.",
       "Any form of cheating, third-party software, emulators (unless explicitly permitted for a specific game), or teaming is strictly prohibited.",
-      "Organizers reserve the right to verify identities and request gameplay recordings or screen shares during dispute investigations."
+      "Screen recording is not mandatory for players; however, Tournament Admins and Event Managers hold full authority to make final conclusions on all match results and disputes."
     ]
   },
   {
@@ -410,17 +408,17 @@ export const RULES_DATA: RuleCategory[] = [
     id: "match",
     title: "Match Rules",
     content: [
-      "Lobby credentials (Room ID and Password) are distributed 15 minutes before scheduled match times via Discord.",
+      "Lobby credentials (Room ID and Password) are ONLY distributed via our official Discord server (no other way) 15 minutes before scheduled match times.",
       "Matches will start precisely at the scheduled time; late arrivals forfeit their slot to reserve players.",
       "Disconnects during a match will be handled according to individual game engine disconnect standards."
     ]
   },
   {
     id: "team",
-    title: "Team Rules",
+    title: "Prize & Team Rules",
     content: [
-      "Team-based rewards must clearly state whether the reward is the total team pool or per-player.",
-      "For BGMI, the ₹150 Main Competition reward is the total winning squad reward, not ₹150 per player.",
+      "Prize distribution is determined per tournament based on the prize pool and is explicitly specified in each tournament's event rules and briefing.",
+      "Team-based rewards will state whether the reward is the total team pool or per-player in the event rules.",
       "Rosters are locked once the tournament round begins; unauthorized substitutions result in squad disqualification."
     ]
   },

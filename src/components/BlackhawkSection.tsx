@@ -1,6 +1,6 @@
 import React from 'react';
 import { BlackhawkLogo } from './BlackhawkLogo';
-import { Shield, Users, Trophy, Mail, MessageSquare, Play, Camera, ExternalLink } from 'lucide-react';
+import { Shield, Users, Trophy, MessageSquare, ExternalLink, Sparkles } from 'lucide-react';
 
 export const BlackhawkSection: React.FC = () => {
   return (
@@ -43,8 +43,8 @@ export const BlackhawkSection: React.FC = () => {
                 </div>
                 <div className="p-2.5 rounded-lg bg-black/50 border border-white/5 text-center">
                   <Trophy className="w-4 h-4 text-[#ff2a2a] mx-auto mb-1" />
-                  <span className="font-tech text-[11px] text-white font-bold block uppercase">₹2,000</span>
-                  <span className="text-[9px] font-tech text-zinc-400 uppercase">Season Pool</span>
+                  <span className="font-tech text-[11px] text-white font-bold block uppercase">ACTIVE</span>
+                  <span className="text-[9px] font-tech text-zinc-400 uppercase">Prize Pools</span>
                 </div>
                 <div className="p-2.5 rounded-lg bg-black/50 border border-white/5 text-center">
                   <Users className="w-4 h-4 text-[#ff2a2a] mx-auto mb-1" />
@@ -54,77 +54,50 @@ export const BlackhawkSection: React.FC = () => {
               </div>
             </div>
 
-            {/* Right: Official Community Hub & Contact */}
-            <div className="lg:col-span-5 bg-black/70 border border-white/10 rounded-xl p-5 space-y-3">
-              <span className="font-tech text-[11px] text-zinc-400 uppercase tracking-widest block font-bold">
-                OFFICIAL COMMUNITY & SOCIAL CHANNELS
-              </span>
+            {/* Right: Official Community Hub (Discord Only) */}
+            <div className="lg:col-span-5 bg-black/70 border border-white/10 rounded-xl p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="font-tech text-[11px] text-zinc-400 uppercase tracking-widest block font-bold">
+                  OFFICIAL COMMUNITY HUB
+                </span>
+                <span className="flex items-center gap-1 text-[10px] font-tech text-[#5865F2] uppercase font-bold bg-[#5865F2]/10 px-2 py-0.5 rounded border border-[#5865F2]/20">
+                  <Sparkles className="w-3 h-3" /> EXCLUSIVE
+                </span>
+              </div>
 
-              {/* Discord */}
+              {/* Discord Main Card */}
               <a
                 href="https://discord.gg/WrxHsKbHY"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center justify-between p-3.5 rounded-lg bg-[#5865F2]/10 hover:bg-[#5865F2]/20 border border-[#5865F2]/30 text-white transition-all group"
+                className="flex flex-col gap-3 p-5 rounded-xl bg-[#5865F2]/10 hover:bg-[#5865F2]/20 border border-[#5865F2]/30 hover:border-[#5865F2]/60 text-white transition-all group shadow-lg hover:shadow-[#5865F2]/10"
               >
-                <div className="flex items-center gap-3">
-                  <MessageSquare className="w-5 h-5 text-[#5865F2]" />
-                  <div>
-                    <span className="font-tech font-bold text-sm block">BLACKHAWK DISCORD</span>
-                    <span className="text-[11px] text-zinc-400 font-sans">Join the official community</span>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-[#5865F2] flex items-center justify-center text-white shadow-md">
+                      <MessageSquare className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <span className="font-tech font-bold text-base block text-white group-hover:text-[#5865F2] transition-colors">
+                        BLACKHAWK DISCORD
+                      </span>
+                      <span className="text-xs text-zinc-400 font-sans">
+                        Official match announcements &amp; room credentials
+                      </span>
+                    </div>
                   </div>
+                  <ExternalLink className="w-4 h-4 text-zinc-400 group-hover:text-white transition-colors shrink-0" />
                 </div>
-                <ExternalLink className="w-4 h-4 text-zinc-500 group-hover:text-white transition-colors" />
+
+                <div className="pt-2 border-t border-white/10 flex items-center justify-between text-[11px] font-tech text-zinc-400">
+                  <span>discord.gg/WrxHsKbHY</span>
+                  <span className="text-[#5865F2] font-semibold group-hover:underline">Join Server &rarr;</span>
+                </div>
               </a>
 
-              {/* Instagram */}
-              <a
-                href="#"
-                onClick={(e) => {
-                  e.preventDefault();
-                  alert("INSTAGRAM LINK — ADD LINK (Provided by Blackhawk Team)");
-                }}
-                className="flex items-center justify-between p-3.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-white transition-all group"
-              >
-                <div className="flex items-center gap-3">
-                  <Camera className="w-5 h-5 text-[#E1306C]" />
-                  <div>
-                    <span className="font-tech font-bold text-sm block">INSTAGRAM</span>
-                    <span className="text-[11px] text-zinc-400 font-sans">INSTAGRAM LINK — ADD LINK</span>
-                  </div>
-                </div>
-                <ExternalLink className="w-4 h-4 text-zinc-500 group-hover:text-white transition-colors" />
-              </a>
-
-              {/* YouTube */}
-              <a
-                href="#"
-                onClick={(e) => {
-                  e.preventDefault();
-                  alert("YOUTUBE LINK — ADD LINK (Provided by Blackhawk Team)");
-                }}
-                className="flex items-center justify-between p-3.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-white transition-all group"
-              >
-                <div className="flex items-center gap-3">
-                  <Play className="w-5 h-5 text-[#FF0000]" />
-                  <div>
-                    <span className="font-tech font-bold text-sm block">YOUTUBE STREAM</span>
-                    <span className="text-[11px] text-zinc-400 font-sans">YOUTUBE LINK — ADD LINK</span>
-                  </div>
-                </div>
-                <ExternalLink className="w-4 h-4 text-zinc-500 group-hover:text-white transition-colors" />
-              </a>
-
-              {/* Contact Email */}
-              <div className="pt-2 border-t border-white/10 flex items-center justify-between text-xs font-tech text-zinc-400">
-                <span className="flex items-center gap-2">
-                  <Mail className="w-4 h-4 text-[#ff2a2a]" />
-                  <span>DIRECT INQUIRIES:</span>
-                </span>
-                <a href="mailto:contact@blackhawkteam.gg" className="text-white hover:text-[#ff3333] transition-colors font-mono">
-                  contact@blackhawkteam.gg
-                </a>
-              </div>
+              <p className="text-[11px] text-zinc-500 font-sans leading-relaxed">
+                All tournament room IDs, passwords, brackets, and live support are distributed exclusively via Discord.
+              </p>
             </div>
 
           </div>
