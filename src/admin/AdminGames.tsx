@@ -82,6 +82,7 @@ export const AdminGames: React.FC = () => {
     e.preventDefault();
     sfx.playClick();
     try {
+      const isBoolActive = Boolean(formActive);
       if (editingGame) {
         await adminApi.updateGame(editingGame.id, {
           name: formName,
@@ -91,7 +92,7 @@ export const AdminGames: React.FC = () => {
           description: formDescription,
           banner: formBanner,
           logo: formLogo,
-          active: formActive ? 1 : 0
+          active: isBoolActive
         });
       } else {
         await adminApi.createGame({
@@ -102,7 +103,7 @@ export const AdminGames: React.FC = () => {
           description: formDescription,
           banner: formBanner,
           logo: formLogo,
-          active: formActive ? 1 : 0
+          active: isBoolActive
         });
       }
       sfx.playSuccess();
@@ -116,12 +117,20 @@ export const AdminGames: React.FC = () => {
 
   const handleToggleActive = async (game: any) => {
     sfx.playClick();
+    const isCurrentlyActive = game.active === true || game.active === 1 || game.active === 'true';
+    const newActive = !isCurrentlyActive;
+
+    // Optimistic UI state update
+    setGames(prev => prev.map(g => g.id === game.id ? { ...g, active: newActive } : g));
+
     try {
-      const isCurrentlyActive = game.active === 1 || game.active === true;
-      await adminApi.updateGame(game.id, { active: isCurrentlyActive ? 0 : 1 });
+      await adminApi.updateGame(game.id, { active: newActive });
+      sfx.playSuccess();
       fetchGames();
     } catch (err: any) {
+      sfx.playError();
       setError(err.message || 'Failed to toggle visibility status');
+      fetchGames();
     }
   };
 
@@ -220,7 +229,7 @@ export const AdminGames: React.FC = () => {
                 </tr>
               ) : (
                 filteredGames.map((game) => {
-                  const isActive = game.active === 1 || game.active === true;
+                  const isActive = game.active === true || game.active === 1 || game.active === 'true';
                   return (
                     <tr key={game.id} className="hover:bg-white/[0.015]">
                       <td className="p-3.5 font-medium text-white flex items-center gap-3">

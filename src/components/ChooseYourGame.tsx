@@ -35,7 +35,7 @@ export const ChooseYourGame: React.FC<ChooseYourGameProps> = ({
       const data = await safeFetchJson<DBGame[]>('/api/games', [], 'games');
       if (Array.isArray(data)) {
         // Strict filter: only show games that are active (1 or true)
-        const activeGames = data.filter(g => g.active === 1 || g.active === true);
+        const activeGames = data.filter(g => Boolean(g.active === true || g.active === 1));
         setGames(activeGames);
       }
     } catch (err) {

@@ -288,54 +288,62 @@ export const AdminPlayers: React.FC = () => {
                   </td>
                 </tr>
               ) : (
-                players.map((p) => (
-                  <tr key={p.id} className="hover:bg-white/[0.02] transition-colors">
-                    <td className="py-3 px-4 font-mono text-[11px] text-zinc-500">
-                      {p.id.length > 12 ? p.id.slice(0, 10) + '...' : p.id}
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-full overflow-hidden border border-white/15 bg-zinc-900 shrink-0 flex items-center justify-center">
-                          <img
-                            src={`https://unavatar.io/discord/${encodeURIComponent((p.discordUsername || p.gamerTag).trim().replace(/^@/, ''))}?fallback=https%3A%2F%2Fapi.dicebear.com%2F7.x%2Fbottts%2Fsvg%3Fseed%3D${encodeURIComponent(p.gamerTag)}%26backgroundColor%3D09090b`}
-                            alt={p.gamerTag}
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(p.gamerTag)}&backgroundColor=09090b,18181b`;
-                            }}
-                          />
+                players.map((p) => {
+                  const tag = p.gamerTag || (p as any).gamer_tag || 'player';
+                  const name = p.fullName || (p as any).full_name || tag;
+                  const discord = p.discordUsername || (p as any).discord_username || 'N/A';
+                  const game = p.game || 'ALL';
+                  const team = p.team || (p as any).team_name;
+                  const dateStr = p.createdAt || (p as any).created_at || (p as any).joined_at;
+
+                  return (
+                    <tr key={p.id} className="hover:bg-white/[0.02] transition-colors">
+                      <td className="py-3 px-4 font-mono text-[11px] text-zinc-500">
+                        {p.id && p.id.length > 12 ? p.id.slice(0, 10) + '...' : p.id}
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-full overflow-hidden border border-white/15 bg-zinc-900 shrink-0 flex items-center justify-center">
+                            <img
+                              src={`https://unavatar.io/discord/${encodeURIComponent(discord.trim().replace(/^@/, ''))}?fallback=https%3A%2F%2Fapi.dicebear.com%2F7.x%2Fbottts%2Fsvg%3Fseed%3D${encodeURIComponent(tag)}%26backgroundColor%3D09090b`}
+                              alt={tag}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(tag)}&backgroundColor=09090b,18181b`;
+                              }}
+                            />
+                          </div>
+                          <div>
+                            <div className="font-bold text-white">{name}</div>
+                            <div className="text-[11px] text-red-400 font-mono">@{tag}</div>
+                          </div>
                         </div>
-                        <div>
-                          <div className="font-bold text-white">{p.fullName}</div>
-                          <div className="text-[11px] text-red-400 font-mono">@{p.gamerTag}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="py-3 px-4 text-zinc-300 font-mono text-[11px]">
-                      {p.discordUsername || 'N/A'}
-                    </td>
-                    <td className="py-3 px-4">
-                      <span className="px-2 py-0.5 rounded bg-zinc-900 border border-white/10 text-[10px] font-bold text-zinc-300">
-                        {p.game}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-zinc-400">
-                      {p.team || <span className="text-zinc-600 italic">Solo</span>}
-                    </td>
-                    <td className="py-3 px-4 text-zinc-400 text-[11px]">
-                      {p.createdAt ? new Date(p.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}
-                    </td>
-                    <td className="py-3 px-4">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase border ${
-                        p.status === 'ACTIVE'
-                          ? 'bg-emerald-950/40 text-emerald-400 border-emerald-500/30'
-                          : p.status === 'DISQUALIFIED'
-                          ? 'bg-red-950/60 text-red-400 border-red-500/40'
-                          : 'bg-zinc-800 text-zinc-400 border-white/10'
-                      }`}>
-                        {p.status}
-                      </span>
-                    </td>
+                      </td>
+                      <td className="py-3 px-4 text-zinc-300 font-mono text-[11px]">
+                        {discord}
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className="px-2 py-0.5 rounded bg-zinc-900 border border-white/10 text-[10px] font-bold text-zinc-300">
+                          {game}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-zinc-400">
+                        {team || <span className="text-zinc-600 italic">Solo</span>}
+                      </td>
+                      <td className="py-3 px-4 text-zinc-400 text-[11px]">
+                        {dateStr ? new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase border ${
+                          p.status === 'ACTIVE'
+                            ? 'bg-emerald-950/40 text-emerald-400 border-emerald-500/30'
+                            : p.status === 'DISQUALIFIED'
+                            ? 'bg-red-950/60 text-red-400 border-red-500/40'
+                            : 'bg-zinc-800 text-zinc-400 border-white/10'
+                        }`}>
+                          {p.status}
+                        </span>
+                      </td>
                     <td className="py-3 px-4 text-right">
                       <div className="flex items-center justify-end gap-1.5">
                         <button
@@ -362,9 +370,10 @@ export const AdminPlayers: React.FC = () => {
                       </div>
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
+                );
+              })
+            )}
+          </tbody>
           </table>
         </div>
       </div>

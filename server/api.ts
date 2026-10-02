@@ -352,7 +352,7 @@ apiRouter.get('/games', async (req: Request, res: Response) => {
   try {
     const showAll = req.query.all === 'true';
     const games = await supabaseDb.list<any>('games');
-    const filtered = showAll ? games : games.filter(g => g.active === 1 || g.active === true);
+    const filtered = showAll ? games : games.filter(g => g.active === true || g.active === 1 || g.active === 'true');
     res.json(filtered);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -365,6 +365,7 @@ apiRouter.post('/games', requireAdminAuth, async (req: Request, res: Response) =
     if (!name) return res.status(400).json({ error: 'Game name is required.' });
 
     const gameId = id || name.toLowerCase().replace(/[^a-z0-9]/g, '-');
+    const isBoolActive = active === undefined ? true : Boolean(active === true || active === 1 || active === 'true');
     const game = {
       id: gameId,
       name,
@@ -374,7 +375,7 @@ apiRouter.post('/games', requireAdminAuth, async (req: Request, res: Response) =
       category: category || 'ESPORTS',
       defaultPrizePool: defaultPrizePool || 0,
       format: format || 'SOLO',
-      active: active === undefined ? 1 : (active ? 1 : 0),
+      active: isBoolActive,
       createdAt: new Date().toISOString()
     };
 
@@ -391,10 +392,14 @@ apiRouter.patch('/games/:id', requireAdminAuth, async (req: Request, res: Respon
     const existing = await supabaseDb.get<any>(`blackhawk/games/${id}`);
     if (!existing) return res.status(404).json({ error: 'Game not found.' });
 
+    const isBoolActive = req.body.active !== undefined
+      ? Boolean(req.body.active === true || req.body.active === 1 || req.body.active === 'true')
+      : Boolean(existing.active === true || existing.active === 1 || existing.active === 'true');
+
     const updated = {
       ...existing,
       ...req.body,
-      active: req.body.active !== undefined ? (req.body.active ? 1 : 0) : existing.active,
+      active: isBoolActive,
       updatedAt: new Date().toISOString()
     };
 

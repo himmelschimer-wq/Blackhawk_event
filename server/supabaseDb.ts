@@ -70,11 +70,12 @@ function toDbRow(data: any): Record<string, any> {
   const row: Record<string, any> = {};
   for (const [key, value] of Object.entries(data)) {
     // specific key overrides
-    if (key === 'gameSpecificDetails') row['game_specific_details'] = value;
+    if (key === 'gameSpecificDetails' || key === 'gameSpecificData') row['game_specific_details'] = value;
     else if (key === 'prizeRules') row['prize_rules'] = value;
     else if (key === 'winnersJson') row['winners_json'] = value;
     else if (key === 'calculationsJson') row['calculations_json'] = value;
     else if (key === 'points' && typeof value === 'object') row['points'] = value;
+    else if (key === 'active') row['active'] = Boolean(value === true || value === 1 || value === 'true');
     else {
       // standard camelCase to snake_case
       const snake = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
@@ -89,13 +90,19 @@ function fromDbRow<T = any>(row: any): T {
   if (!row || typeof row !== 'object') return row;
   const obj: Record<string, any> = {};
   for (const [key, value] of Object.entries(row)) {
-    if (key === 'game_specific_details') obj['gameSpecificDetails'] = value;
+    if (key === 'game_specific_details') {
+      obj['gameSpecificDetails'] = value;
+      obj['gameSpecificData'] = value;
+    }
     else if (key === 'prize_rules') obj['prizeRules'] = value;
     else if (key === 'winners_json') obj['winnersJson'] = value;
     else if (key === 'calculations_json') obj['calculationsJson'] = value;
+    else if (key === 'active') obj['active'] = Boolean(value === true || value === 1 || value === 'true');
     else {
       const camel = key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
       obj[camel] = value;
+      // also preserve snake_case key for backward compatibility
+      obj[key] = value;
     }
   }
   return obj as T;

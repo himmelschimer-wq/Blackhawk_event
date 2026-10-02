@@ -1,4 +1,5 @@
 import { supabase, isSupabaseConfigured } from './supabase';
+import { normalizeDbRow } from './adminApi';
 
 /**
  * Safely fetches JSON from an API endpoint.
@@ -16,7 +17,10 @@ export async function safeFetchJson<T>(
     if (res.ok && contentType.includes('application/json')) {
       const data = await res.json();
       if (data !== undefined && data !== null) {
-        return data as T;
+        if (Array.isArray(data)) {
+          return data.map(r => normalizeDbRow(r)) as unknown as T;
+        }
+        return (typeof data === 'object' ? normalizeDbRow(data) : data) as T;
       }
     }
   } catch (err) {
@@ -35,7 +39,7 @@ export async function safeFetchJson<T>(
 
       const { data, error } = await supabase.from(normalizedTable).select('*');
       if (!error && Array.isArray(data) && data.length > 0) {
-        return data as unknown as T;
+        return data.map(r => normalizeDbRow(r)) as unknown as T;
       }
     } catch (e) {
       console.warn(`[Supabase Fallback] Error querying ${supabaseTableFallback}:`, e);

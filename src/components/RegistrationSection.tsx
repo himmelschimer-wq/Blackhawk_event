@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import confetti from 'canvas-confetti';
-import { type RegistrationRecord } from '../lib/tournamentStore';
+import { tournamentStore, type RegistrationRecord } from '../lib/tournamentStore';
+import { adminApi } from '../lib/adminApi';
 import { BlackhawkLogo } from './BlackhawkLogo';
 import { 
   Send, 
@@ -367,30 +368,53 @@ export const RegistrationSection: React.FC<RegistrationProps> = ({
         }
       }
 
-      // Submit directly to REAL database API endpoint
-      const response = await fetch('/api/registrations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      // Submit directly to REAL database API endpoint & fallback handlers
+      let result: any = null;
+      try {
+        result = await adminApi.submitRegistration({
           fullName,
           gamerTag,
           discordUsername,
           games: entries
-        })
-      });
-
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({ error: 'Registration submission failed' }));
-        throw new Error(errData.error || 'Registration submission failed');
+        });
+      } catch (e: any) {
+        console.warn('API error during registration, checking tournament store fallback...', e);
       }
 
-      const result = await response.json();
+      // Sync to tournament store so UI state updates immediately
+      try {
+        tournamentStore.registerPlayerMultiple({
+          fullName: fullName || gamerTag,
+          gamerTag,
+          discordUsername: discordUsername || 'N/A',
+          games: entries.map(e => ({
+            gameId: e.gameId,
+            gameName: e.gameName,
+            week: 'Week 1',
+            playType: e.playType === 'Team / Squad' ? 'Team / Squad' : 'Solo',
+            teamName: e.teamName,
+            teamMembers: e.teamMembers,
+            gameSpecificDetails: e.gameSpecificDetails
+          }))
+        });
+      } catch (storeErr) {
+        console.warn('Local store sync error:', storeErr);
+      }
+
+      if (!result) {
+        throw new Error('Could not record registration in database.');
+      }
+
+      const confirmedPlayerName = result.player?.fullName || result.player?.full_name || fullName;
+      const confirmedGamerTag = result.player?.gamerTag || result.player?.gamer_tag || gamerTag;
+      const confirmedDiscord = result.player?.discordUsername || result.player?.discord_username || discordUsername;
+      const confirmedRegs = Array.isArray(result.registrations) ? result.registrations : [];
 
       setConfirmedPass({
-        player: result.player.fullName,
-        gamerTag: result.player.gamerTag,
-        discord: result.player.discordUsername,
-        registrations: result.registrations,
+        player: confirmedPlayerName,
+        gamerTag: confirmedGamerTag,
+        discord: confirmedDiscord,
+        registrations: confirmedRegs,
         registeredAt: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
       });
 

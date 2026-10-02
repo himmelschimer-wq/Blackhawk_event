@@ -243,44 +243,52 @@ export const AdminRegistrations: React.FC = () => {
                   </td>
                 </tr>
               ) : (
-                paginatedRegistrations.map((reg) => (
-                  <tr key={reg.id} className="hover:bg-white/[0.02] transition-colors">
-                    <td className="py-3.5 px-4 font-mono text-[11px] text-zinc-400 font-bold">
-                      {reg.id}
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <div className="font-bold text-white">{reg.playerName}</div>
-                      <div className="text-[11px] text-red-400 font-mono">@{reg.gamerTag}</div>
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <span className="px-2 py-0.5 rounded bg-zinc-900 border border-white/10 text-[10px] font-bold text-zinc-300">
-                        {reg.gameName}
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-4 text-zinc-300 text-[11px]">
-                      {reg.eventTitle || 'Open Tournament'}
-                    </td>
-                    <td className="py-3.5 px-4 text-zinc-400">
-                      {reg.teamName || <span className="text-zinc-600 italic">Solo</span>}
-                    </td>
-                    <td className="py-3.5 px-4 text-zinc-400 text-[11px]">
-                      {new Date(reg.registeredAt).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric'
-                      })}
-                    </td>
-                    <td className="py-3.5 px-4 text-center">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${
-                        reg.status === 'APPROVED'
-                          ? 'bg-emerald-950/40 text-emerald-400 border-emerald-500/30'
-                          : reg.status === 'REJECTED'
-                          ? 'bg-red-950/60 text-red-400 border-red-500/40'
-                          : 'bg-amber-950/40 text-amber-400 border-amber-500/30'
-                      }`}>
-                        {reg.status}
-                      </span>
-                    </td>
+                paginatedRegistrations.map((reg) => {
+                  const pName = reg.playerName || (reg as any).player_name || 'Athlete';
+                  const gTag = reg.gamerTag || (reg as any).gamer_tag || 'player';
+                  const gName = reg.gameName || (reg as any).game_name || 'BGMI';
+                  const eTitle = reg.eventTitle || (reg as any).event_title || 'Open Tournament';
+                  const tName = reg.teamName || (reg as any).team_name;
+                  const regDate = reg.registeredAt || (reg as any).registered_at || (reg as any).created_at;
+
+                  return (
+                    <tr key={reg.id} className="hover:bg-white/[0.02] transition-colors">
+                      <td className="py-3.5 px-4 font-mono text-[11px] text-zinc-400 font-bold">
+                        {reg.id}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <div className="font-bold text-white">{pName}</div>
+                        <div className="text-[11px] text-red-400 font-mono">@{gTag}</div>
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span className="px-2 py-0.5 rounded bg-zinc-900 border border-white/10 text-[10px] font-bold text-zinc-300">
+                          {gName}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4 text-zinc-300 text-[11px]">
+                        {eTitle}
+                      </td>
+                      <td className="py-3.5 px-4 text-zinc-400">
+                        {tName || <span className="text-zinc-600 italic">Solo</span>}
+                      </td>
+                      <td className="py-3.5 px-4 text-zinc-400 text-[11px]">
+                        {regDate ? new Date(regDate).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric'
+                        }) : 'N/A'}
+                      </td>
+                      <td className="py-3.5 px-4 text-center">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${
+                          reg.status === 'APPROVED'
+                            ? 'bg-emerald-950/40 text-emerald-400 border-emerald-500/30'
+                            : reg.status === 'REJECTED'
+                            ? 'bg-red-950/60 text-red-400 border-red-500/40'
+                            : 'bg-amber-950/40 text-amber-400 border-amber-500/30'
+                        }`}>
+                          {reg.status || 'REGISTERED'}
+                        </span>
+                      </td>
                     <td className="py-3.5 px-4 text-right">
                       <div className="flex items-center justify-end gap-1.5">
                         <button
@@ -326,9 +334,10 @@ export const AdminRegistrations: React.FC = () => {
                       </div>
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
+                );
+              })
+            )}
+          </tbody>
           </table>
         </div>
 
