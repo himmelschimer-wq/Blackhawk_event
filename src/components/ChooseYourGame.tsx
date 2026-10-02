@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ArrowUpRight, ChevronLeft, ChevronRight, Gamepad2, Calendar } from 'lucide-react';
 import { sfx } from '../utils/sfx';
+import { ScrollReveal } from './ScrollReveal';
 
 import { safeFetchJson } from '../lib/apiHelper';
 
@@ -53,42 +54,44 @@ export const ChooseYourGame: React.FC<ChooseYourGameProps> = ({
     <section id="games" className="py-7 sm:py-9 bg-[#080808] border-b border-white/[0.04]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-5 sm:mb-6">
-          <div>
-            <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-red-950/30 border border-red-500/25 text-[#ff4d4d] font-tech text-[9px] tracking-wider uppercase mb-1.5">
-              <Gamepad2 className="w-2.5 h-2.5" />
-              <span>COMMUNITY TITLES</span>
+        <ScrollReveal>
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-5 sm:mb-6">
+            <div>
+              <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-red-950/30 border border-red-500/25 text-[#ff4d4d] font-tech text-[9px] tracking-wider uppercase mb-1.5">
+                <Gamepad2 className="w-2.5 h-2.5" />
+                <span>COMMUNITY TITLES</span>
+              </div>
+              <h2 className="font-cinzel text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight text-[#f2f2f4]">
+                CHOOSE YOUR <span className="text-[#D71920]">GAME</span>
+              </h2>
+              <p className="text-zinc-400 text-[11px] sm:text-xs font-sans mt-0.5">
+                Pick a game title to filter events and view custom rules.
+              </p>
             </div>
-            <h2 className="font-cinzel text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight text-[#f2f2f4]">
-              CHOOSE YOUR <span className="text-[#D71920]">GAME</span>
-            </h2>
-            <p className="text-zinc-400 text-[11px] sm:text-xs font-sans mt-0.5">
-              Pick a game title to filter events and view custom rules.
-            </p>
-          </div>
 
-          <div className="flex items-center gap-3">
-            <span className="text-[9px] sm:text-[10px] font-semibold tracking-[0.18em] text-[#71717a] uppercase hidden sm:inline">
-              CLICK TO BROWSE EVENTS
-            </span>
-            <div className="flex items-center gap-1">
-              <button
-                className="w-6 h-6 rounded-full border border-white/10 bg-white/[0.02] flex items-center justify-center text-zinc-500 hover:text-white hover:border-white/20 transition-all cursor-pointer"
-                aria-label="Previous games"
-                onClick={() => sfx.playClick()}
-              >
-                <ChevronLeft className="w-3 h-3" />
-              </button>
-              <button
-                className="w-6 h-6 rounded-full border border-white/10 bg-white/[0.02] flex items-center justify-center text-zinc-500 hover:text-white hover:border-white/20 transition-all cursor-pointer"
-                aria-label="Next games"
-                onClick={() => sfx.playClick()}
-              >
-                <ChevronRight className="w-3 h-3" />
-              </button>
+            <div className="flex items-center gap-3">
+              <span className="text-[9px] sm:text-[10px] font-semibold tracking-[0.18em] text-[#71717a] uppercase hidden sm:inline">
+                CLICK TO BROWSE EVENTS
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  className="w-6 h-6 rounded-full border border-white/10 bg-white/[0.02] flex items-center justify-center text-zinc-500 hover:text-white hover:border-white/20 transition-all cursor-pointer"
+                  aria-label="Previous games"
+                  onClick={() => sfx.playClick()}
+                >
+                  <ChevronLeft className="w-3 h-3" />
+                </button>
+                <button
+                  className="w-6 h-6 rounded-full border border-white/10 bg-white/[0.02] flex items-center justify-center text-zinc-500 hover:text-white hover:border-white/20 transition-all cursor-pointer"
+                  aria-label="Next games"
+                  onClick={() => sfx.playClick()}
+                >
+                  <ChevronRight className="w-3 h-3" />
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        </ScrollReveal>
 
         {/* Empty State from Database */}
         {!loading && games.length === 0 && (

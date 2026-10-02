@@ -170,55 +170,44 @@
   filter: drop-shadow(0 0 20px rgba(215, 25, 32, 0.45));
 }
 
-/* ─── Hero Cinematic Entrance Sequence (1.0s – 1.4s Total Orchestration) ─── */
+/* ─── Hero Cinematic Entrance Sequence (Clean Sequential Choreography) ─── */
 
-/* 1. BlackHawk Crest: Subtle scale-up (0.85 -> 1.0) with restrained red glow */
+/* 1. Eyebrow: Fade and gently lift in "DISCORD GAMING COMMUNITY" */
+@keyframes heroEyebrowLift {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 2. BlackHawk Crest: Subtle scale-up (0.88 -> 1.0) with restrained red glow */
 @keyframes heroCrestEntrance {
   0% {
     opacity: 0;
-    transform: scale(0.85);
-    filter: drop-shadow(0 0 28px rgba(215, 25, 32, 0.75));
+    transform: scale(0.88);
+    filter: drop-shadow(0 0 20px rgba(215, 25, 32, 0.6));
   }
-  65% {
+  70% {
     opacity: 1;
     transform: scale(1.02);
-    filter: drop-shadow(0 0 20px rgba(215, 25, 32, 0.4)) drop-shadow(0 15px 30px rgba(0,0,0,0.85));
+    filter: drop-shadow(0 0 16px rgba(215, 25, 32, 0.35)) drop-shadow(0 15px 30px rgba(0,0,0,0.85));
   }
   100% {
     opacity: 1;
     transform: scale(1);
-    filter: drop-shadow(0 15px 30px rgba(0,0,0,0.85)) drop-shadow(0 0 10px rgba(215, 25, 32, 0.15));
+    filter: drop-shadow(0 15px 30px rgba(0,0,0,0.85)) drop-shadow(0 0 8px rgba(215, 25, 32, 0.12));
   }
 }
 
-/* 2. "BLACKHAWK" Headline: Brief left-to-right light sweep (single-pass, then resting) */
-@keyframes headlineLightSweepOnce {
+/* 3. "BLACKHAWK" Headline: Subtle upward motion with quick restrained light sweep */
+@keyframes heroHeadlineEntrance {
   0% {
     opacity: 0;
-    transform: translateY(12px);
-    background-size: 250% 100%;
-    background-position: -140% 0;
-  }
-  30% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-  65% {
-    background-position: 60% 0;
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0);
-    background-size: 100% 100%;
-    background-position: 0 0;
-  }
-}
-
-/* 3. Supporting Text: Fade and slide upward just after headline */
-@keyframes textSlideUpFade {
-  0% {
-    opacity: 0;
-    transform: translateY(16px);
+    transform: translateY(10px);
   }
   100% {
     opacity: 1;
@@ -226,30 +215,42 @@
   }
 }
 
-/* 4. "REGISTER NOW" Button: Arrives last with restrained red pulse that settles into normal state */
+/* 4. Supporting Paragraph: Staggered smooth line-by-line fade and gentle lift */
+@keyframes heroParagraphLine {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 5. "REGISTER NOW" CTA: Arrives after copy with restrained red pulse that settles cleanly */
 @keyframes registerButtonEntrance {
   0% {
     opacity: 0;
-    transform: translateY(14px) scale(0.94);
+    transform: translateY(10px) scale(0.96);
     box-shadow: 0 0 0px rgba(215, 25, 32, 0);
   }
   65% {
     opacity: 1;
-    transform: translateY(0) scale(1.03);
-    box-shadow: 0 0 35px rgba(215, 25, 32, 0.7);
+    transform: translateY(0) scale(1.02);
+    box-shadow: 0 0 28px rgba(215, 25, 32, 0.6);
   }
   100% {
     opacity: 1;
     transform: translateY(0) scale(1.0);
-    box-shadow: 0 0 25px rgba(215, 25, 32, 0.4);
+    box-shadow: 0 0 20px rgba(215, 25, 32, 0.4);
   }
 }
 
-/* 5. "View Events" / Secondary Buttons / Stats: Short stagger */
+/* 6. Secondary Buttons & Stats */
 @keyframes secondaryEntrance {
   0% {
     opacity: 0;
-    transform: translateY(14px);
+    transform: translateY(10px);
   }
   100% {
     opacity: 1;
@@ -257,7 +258,19 @@
   }
 }
 
-/* 6. Navbar slide down */
+/* 7. Section Headings: Viewport Scroll Entrance (Brief fade and rise) */
+@keyframes sectionHeadingRise {
+  0% {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 8. Navbar slide down */
 @keyframes navbarSlideDown {
   0% {
     opacity: 0;
@@ -269,7 +282,7 @@
   }
 }
 
-/* 7. Bottom mobile bar slide up */
+/* 9. Bottom mobile bar slide up */
 @keyframes bottomNavSlideUp {
   0% {
     opacity: 0;
@@ -282,28 +295,40 @@
 }
 
 /* ─── Utility Class Bindings with Precise Choreographed Delays ─── */
+.animate-hero-eyebrow {
+  animation: heroEyebrowLift 0.45s cubic-bezier(0.16, 1, 0.3, 1) 0.12s both;
+}
+
 .animate-hero-crest {
-  animation: heroCrestEntrance 0.55s cubic-bezier(0.16, 1, 0.3, 1) 0.05s both;
+  animation: heroCrestEntrance 0.55s cubic-bezier(0.16, 1, 0.3, 1) 0.15s both;
 }
 
 .animate-hero-headline {
-  animation: headlineLightSweepOnce 0.65s cubic-bezier(0.16, 1, 0.3, 1) 0.2s both;
+  animation: heroHeadlineEntrance 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.28s both;
 }
 
-.animate-hero-text {
-  animation: textSlideUpFade 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.38s both;
+.animate-hero-para-1 {
+  animation: heroParagraphLine 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.52s both;
+}
+
+.animate-hero-para-2 {
+  animation: heroParagraphLine 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.72s both;
 }
 
 .animate-hero-register {
-  animation: registerButtonEntrance 0.65s cubic-bezier(0.16, 1, 0.3, 1) 0.58s both;
+  animation: registerButtonEntrance 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.92s both;
 }
 
 .animate-hero-secondary {
-  animation: secondaryEntrance 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.7s both;
+  animation: secondaryEntrance 0.5s cubic-bezier(0.16, 1, 0.3, 1) 1.05s both;
 }
 
 .animate-hero-stats {
-  animation: secondaryEntrance 0.65s cubic-bezier(0.16, 1, 0.3, 1) 0.78s both;
+  animation: secondaryEntrance 0.55s cubic-bezier(0.16, 1, 0.3, 1) 1.18s both;
+}
+
+.animate-heading-rise {
+  animation: sectionHeadingRise 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .animate-site-navbar {
@@ -324,16 +349,20 @@
 
 /* ─── Reduced Motion Support ─── */
 @media (prefers-reduced-motion: reduce) {
+  .animate-hero-eyebrow,
   .animate-hero-crest,
   .animate-hero-headline,
-  .animate-hero-text,
+  .animate-hero-para-1,
+  .animate-hero-para-2,
   .animate-hero-register,
   .animate-hero-secondary,
   .animate-hero-stats,
+  .animate-heading-rise,
   .animate-site-navbar,
   .animate-site-bottomnav,
   .animate-site-content,
-  .animate-site-footer {
+  .animate-site-footer,
+  .text-red-white-shine {
     animation: none !important;
     opacity: 1 !important;
     transform: none !important;

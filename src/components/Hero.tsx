@@ -87,8 +87,8 @@ export const Hero: React.FC<HeroProps> = ({
           {/* Left Column: Headlines & CTAs */}
           <div className="lg:col-span-7 xl:col-span-6 space-y-4 sm:space-y-6 pt-2 sm:pt-4">
             
-            {/* Small Eyebrow (Slides up with text) */}
-            <div className={`flex items-center gap-2.5 sm:gap-3 ${isRevealed ? 'animate-hero-text' : ''}`}>
+            {/* Small Eyebrow: Fade and gently lift in */}
+            <div className={`flex items-center gap-2.5 sm:gap-3 ${isRevealed ? 'animate-hero-eyebrow' : 'opacity-0'}`}>
               <span className="w-5 sm:w-6 h-[1.5px] bg-[#D71920]" />
               <p className="text-[10px] sm:text-xs font-semibold tracking-[0.24em] sm:tracking-[0.28em] text-[#a8a8af] uppercase">
                 DISCORD GAMING COMMUNITY
@@ -99,7 +99,7 @@ export const Hero: React.FC<HeroProps> = ({
             <div className="flex items-center gap-3 sm:gap-5 select-none py-0.5">
               
               {/* Mobile Emblem Badge (Scale-up + Red Glow) */}
-              <div className={`relative shrink-0 w-14 sm:w-20 md:w-24 lg:hidden ${isRevealed ? 'animate-hero-crest' : ''}`}>
+              <div className={`relative shrink-0 w-14 sm:w-20 md:w-24 lg:hidden ${isRevealed ? 'animate-hero-crest' : 'opacity-0'}`}>
                 <div className="absolute inset-0 bg-[#D71920]/20 rounded-full blur-sm" />
                 <img
                   src="/assets/blackhawk_emblem_hq.png"
@@ -108,8 +108,8 @@ export const Hero: React.FC<HeroProps> = ({
                 />
               </div>
 
-              {/* "BLACKHAWK" Headline (Left-to-Right Light Sweep) */}
-              <div className={`relative inline-block ${isRevealed ? 'animate-hero-headline' : ''}`}>
+              {/* "BLACKHAWK" Headline (Subtle upward motion & quick restrained light sweep) */}
+              <div className={`relative inline-block ${isRevealed ? 'animate-hero-headline' : 'opacity-0'}`}>
                 <h1 className="font-cinzel text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black tracking-wider leading-[1.08]">
                   <span className="text-red-white-shine">
                     BLACKHAWK
@@ -118,15 +118,20 @@ export const Hero: React.FC<HeroProps> = ({
               </div>
             </div>
 
-            {/* Subtitle Supporting Text (Fade & Slide Upward) */}
-            <p className={`text-xs sm:text-sm md:text-base text-[#9a9aa0] max-w-xl font-normal leading-relaxed ${isRevealed ? 'animate-hero-text' : ''}`}>
-              BlackHawk is a Discord community created by <span className="text-white font-medium">blackhawkop</span> where we host fun games and exciting events. This isn&apos;t a corporate setup — it&apos;s all about hosting fun community events to enjoy games even more with each other.
+            {/* Supporting Paragraph (Smooth line-by-line appearance with short stagger) */}
+            <p className="text-xs sm:text-sm md:text-base text-[#9a9aa0] max-w-xl font-normal leading-relaxed">
+              <span className={`block ${isRevealed ? 'animate-hero-para-1' : 'opacity-0'}`}>
+                BlackHawk is a Discord community created by <span className="text-white font-medium">blackhawkop</span> where we host fun games and exciting events.
+              </span>
+              <span className={`block mt-1 sm:mt-1.5 ${isRevealed ? 'animate-hero-para-2' : 'opacity-0'}`}>
+                This isn&apos;t a corporate setup — it&apos;s all about hosting fun community events to enjoy games even more with each other.
+              </span>
             </p>
 
-            {/* Action Buttons: Synchronized Staggered Arrival */}
+            {/* Action Buttons: Revealed sequentially after copy */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 pt-2">
               
-              {/* "REGISTER NOW" CTA (Arrives last with restrained red pulse that settles into normal state) */}
+              {/* "REGISTER NOW" CTA (Arrives after copy with restrained red pulse that settles cleanly) */}
               <button
                 onClick={() => {
                   sfx.playClick();
@@ -134,7 +139,7 @@ export const Hero: React.FC<HeroProps> = ({
                 }}
                 onMouseEnter={() => sfx.playHover()}
                 className={`group px-6 py-3.5 sm:py-3 rounded-full bg-gradient-to-r from-[#D71920] via-[#c7171d] to-[#ad1318] hover:from-[#e3262e] hover:to-[#c4161d] active:scale-[0.98] text-white text-xs sm:text-sm font-semibold tracking-wider uppercase transition-all duration-300 shadow-[0_0_20px_rgba(215,25,32,0.4)] hover:shadow-[0_0_30px_rgba(215,25,32,0.65)] cursor-pointer flex items-center justify-center gap-2 ${
-                  isRevealed ? 'animate-hero-register' : ''
+                  isRevealed ? 'animate-hero-register' : 'opacity-0'
                 }`}
               >
                 <span>Register Now</span>
@@ -149,7 +154,7 @@ export const Hero: React.FC<HeroProps> = ({
                 }}
                 onMouseEnter={() => sfx.playHover()}
                 className={`px-6 py-3.5 sm:py-3 rounded-full bg-[#121215]/90 hover:bg-[#1a1a1f] active:scale-[0.98] text-[#c0c0c5] hover:text-white text-xs sm:text-sm font-medium tracking-wide border border-white/10 hover:border-white/20 transition-all duration-200 cursor-pointer flex items-center justify-center ${
-                  isRevealed ? 'animate-hero-secondary' : ''
+                  isRevealed ? 'animate-hero-secondary' : 'opacity-0'
                 }`}
               >
                 View Events

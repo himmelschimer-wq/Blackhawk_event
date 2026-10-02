@@ -3,6 +3,7 @@ import { Calendar, Trophy, AlertCircle } from 'lucide-react';
 import { sfx } from '../utils/sfx';
 import { PlayerProfileModal, type PlayerProfileData } from './PlayerProfileModal';
 import { safeFetchJson } from '../lib/apiHelper';
+import { ScrollReveal } from './ScrollReveal';
 
 interface UpcomingEventsAndLeaderboardProps {
   onRegisterEvent: (gameName: string, eventId?: string) => void;
@@ -133,32 +134,34 @@ export const UpcomingEventsAndLeaderboard: React.FC<UpcomingEventsAndLeaderboard
           <div className="lg:col-span-7 xl:col-span-8 space-y-4">
             <div className="bg-[#0b0b0e] border border-white/[0.08] rounded-xl p-5 sm:p-6 shadow-[0_15px_40px_rgba(0,0,0,0.65)] relative overflow-hidden">
               {/* Header */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-white/[0.06] mb-4 gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-7 h-7 rounded-md bg-[#D71920]/15 border border-[#D71920]/30 flex items-center justify-center">
-                    <Calendar className="w-4 h-4 text-[#D71920]" />
+              <ScrollReveal>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-white/[0.06] mb-4 gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-7 h-7 rounded-md bg-[#D71920]/15 border border-[#D71920]/30 flex items-center justify-center">
+                      <Calendar className="w-4 h-4 text-[#D71920]" />
+                    </div>
+                    <div>
+                      <h2 className="font-cinzel text-base sm:text-lg font-bold text-white tracking-wider uppercase">
+                        UPCOMING EVENTS
+                      </h2>
+                      <p className="text-[10px] font-semibold tracking-[0.2em] text-[#71717a] uppercase -mt-0.5">
+                        {selectedGame === 'ALL' ? 'ALL SCHEDULED BATTLES' : `EVENTS FOR ${selectedGame}`}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h2 className="font-cinzel text-base sm:text-lg font-bold text-white tracking-wider uppercase">
-                      UPCOMING EVENTS
-                    </h2>
-                    <p className="text-[10px] font-semibold tracking-[0.2em] text-[#71717a] uppercase -mt-0.5">
-                      {selectedGame === 'ALL' ? 'ALL SCHEDULED BATTLES' : `EVENTS FOR ${selectedGame}`}
-                    </p>
-                  </div>
-                </div>
 
-                <button
-                  onClick={() => {
-                    sfx.playClick();
-                    if (onViewAllEvents) onViewAllEvents();
-                  }}
-                  className="px-3 py-1 rounded-full border border-white/10 hover:border-white/20 bg-white/[0.02] text-[#9a9aa0] hover:text-white text-[11px] font-medium tracking-wide transition-all cursor-pointer flex items-center gap-1.5 self-start sm:self-auto"
-                >
-                  <span>Explore Games</span>
-                  <span className="text-zinc-500">→</span>
-                </button>
-              </div>
+                  <button
+                    onClick={() => {
+                      sfx.playClick();
+                      if (onViewAllEvents) onViewAllEvents();
+                    }}
+                    className="px-3 py-1 rounded-full border border-white/10 hover:border-white/20 bg-white/[0.02] text-[#9a9aa0] hover:text-white text-[11px] font-medium tracking-wide transition-all cursor-pointer flex items-center gap-1.5 self-start sm:self-auto"
+                  >
+                    <span>Explore Games</span>
+                    <span className="text-zinc-500">→</span>
+                  </button>
+                </div>
+              </ScrollReveal>
 
               {/* Game Filter Bar */}
               <div className="flex items-center gap-1.5 overflow-x-auto pb-3 mb-2 scrollbar-none">
@@ -290,32 +293,34 @@ export const UpcomingEventsAndLeaderboard: React.FC<UpcomingEventsAndLeaderboard
           <div id="leaderboard" className="lg:col-span-5 xl:col-span-4 space-y-4">
             <div className="bg-[#0b0b0e] border border-white/[0.08] rounded-xl p-5 sm:p-6 shadow-[0_15px_40px_rgba(0,0,0,0.65)] relative overflow-hidden">
               {/* Header */}
-              <div className="flex items-center justify-between pb-5 border-b border-white/[0.06] mb-2">
-                <div className="flex items-center gap-3">
-                  <div className="w-7 h-7 rounded-md bg-[#D71920]/15 border border-[#D71920]/30 flex items-center justify-center">
-                    <Trophy className="w-4 h-4 text-[#D71920]" />
+              <ScrollReveal>
+                <div className="flex items-center justify-between pb-5 border-b border-white/[0.06] mb-2">
+                  <div className="flex items-center gap-3">
+                    <div className="w-7 h-7 rounded-md bg-[#D71920]/15 border border-[#D71920]/30 flex items-center justify-center">
+                      <Trophy className="w-4 h-4 text-[#D71920]" />
+                    </div>
+                    <div>
+                      <h2 className="font-cinzel text-base sm:text-lg font-bold text-white tracking-wider uppercase">
+                        LEADERBOARD
+                      </h2>
+                      <p className="text-[10px] font-semibold tracking-[0.2em] text-[#71717a] uppercase -mt-0.5">
+                        TOP WARRIORS
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h2 className="font-cinzel text-base sm:text-lg font-bold text-white tracking-wider uppercase">
-                      LEADERBOARD
-                    </h2>
-                    <p className="text-[10px] font-semibold tracking-[0.2em] text-[#71717a] uppercase -mt-0.5">
-                      TOP WARRIORS
-                    </p>
-                  </div>
-                </div>
 
-                <button
-                  onClick={() => {
-                    sfx.playClick();
-                    if (onViewFullLeaderboard) onViewFullLeaderboard();
-                  }}
-                  className="px-3 py-1 rounded-full border border-white/10 hover:border-white/20 bg-white/[0.02] text-[#9a9aa0] hover:text-white text-[11px] font-medium tracking-wide transition-all cursor-pointer flex items-center gap-1.5"
-                >
-                  <span>View Full</span>
-                  <span className="text-zinc-500">→</span>
-                </button>
-              </div>
+                  <button
+                    onClick={() => {
+                      sfx.playClick();
+                      if (onViewFullLeaderboard) onViewFullLeaderboard();
+                    }}
+                    className="px-3 py-1 rounded-full border border-white/10 hover:border-white/20 bg-white/[0.02] text-[#9a9aa0] hover:text-white text-[11px] font-medium tracking-wide transition-all cursor-pointer flex items-center gap-1.5"
+                  >
+                    <span>View Full</span>
+                    <span className="text-zinc-500">→</span>
+                  </button>
+                </div>
+              </ScrollReveal>
 
               {/* Table Column Headers */}
               <div className="flex items-center justify-between py-2 text-[10px] font-semibold tracking-[0.18em] text-[#63636b] uppercase border-b border-white/[0.04]">
