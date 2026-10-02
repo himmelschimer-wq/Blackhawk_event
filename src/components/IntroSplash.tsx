@@ -9,7 +9,7 @@ interface IntroSplashProps {
 export const IntroSplash: React.FC<IntroSplashProps> = ({ 
   onComplete, 
   onStartReveal,
-  durationMs = 2100 
+  durationMs = 2000 
 }) => {
   const [fadingOut, setFadingOut] = useState(false);
 
@@ -63,15 +63,10 @@ export const IntroSplash: React.FC<IntroSplashProps> = ({
         [ESC] SKIP
       </button>
 
-      {/* ─── Centered Text-Only Stage ─── */}
+      {/* ─── Centered Stage ─── */}
       <div className="relative z-10 flex flex-col items-center justify-center px-6 max-w-5xl text-center">
         
-        {/* 1. Small Letter-Spaced Eyebrow */}
-        <p className="intro-eyebrow text-[10px] sm:text-xs md:text-[13px] font-medium tracking-[0.32em] sm:tracking-[0.42em] uppercase text-[#8e8e93] mb-3 sm:mb-4">
-          COMMUNITY TOURNAMENTS &amp; GAMING
-        </p>
-
-        {/* 2. Primary Title: Clean Mask Wipe Left-to-Right */}
+        {/* 1. Primary Title: Mask Wipe Left-to-Right */}
         <div className="intro-title-wrapper overflow-hidden my-1 sm:my-2">
           <h1 className="intro-title font-cinzel font-black text-4xl sm:text-6xl md:text-7xl lg:text-8xl tracking-[0.16em] sm:tracking-[0.22em] uppercase text-white leading-none">
             <span>BLACK</span>
@@ -79,9 +74,9 @@ export const IntroSplash: React.FC<IntroSplashProps> = ({
           </h1>
         </div>
 
-        {/* 3. Refined Tagline Beneath */}
-        <p className="intro-tagline font-cinzel text-[10px] sm:text-xs md:text-sm font-semibold tracking-[0.28em] sm:tracking-[0.38em] uppercase text-[#a1a1aa] mt-4 sm:mt-5">
-          PLAY<span className="text-[#D71920]">.</span> COMPETE<span className="text-[#D71920]">.</span> DOMINATE<span className="text-[#D71920]">.</span>
+        {/* 2. Subtitle Animated Below BLACKHAWK */}
+        <p className="intro-subtitle text-[10px] sm:text-xs md:text-[13px] font-medium tracking-[0.32em] sm:tracking-[0.42em] uppercase text-[#8e8e93] mt-3 sm:mt-4">
+          COMMUNITY TOURNAMENTS &amp; GAMING
         </p>
       </div>
     </div>

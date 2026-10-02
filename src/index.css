@@ -171,17 +171,6 @@
 }
 
 /* ─── Premium Text-Only Intro Animations ─── */
-@keyframes introEyebrowReveal {
-  0% {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
 @keyframes introMaskWipe {
   0% {
     clip-path: inset(0 100% 0 0);
@@ -198,10 +187,10 @@
   }
 }
 
-@keyframes introTaglineReveal {
+@keyframes introSubtitleReveal {
   0% {
     opacity: 0;
-    transform: translateY(6px);
+    transform: translateY(8px);
   }
   100% {
     opacity: 1;
@@ -209,16 +198,12 @@
   }
 }
 
-.intro-eyebrow {
-  animation: introEyebrowReveal 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both;
-}
-
 .intro-title {
-  animation: introMaskWipe 0.65s cubic-bezier(0.16, 1, 0.3, 1) 0.38s both;
+  animation: introMaskWipe 0.65s cubic-bezier(0.16, 1, 0.3, 1) 0.15s both;
 }
 
-.intro-tagline {
-  animation: introTaglineReveal 0.5s cubic-bezier(0.16, 1, 0.3, 1) 1.05s both;
+.intro-subtitle {
+  animation: introSubtitleReveal 0.55s cubic-bezier(0.16, 1, 0.3, 1) 0.65s both;
 }
 
 /* ─── Hero Cinematic Entrance Sequence (Clean Sequential Choreography) ─── */
@@ -400,9 +385,8 @@
 
 /* ─── Reduced Motion Support ─── */
 @media (prefers-reduced-motion: reduce) {
-  .intro-eyebrow,
   .intro-title,
-  .intro-tagline,
+  .intro-subtitle,
   .animate-hero-eyebrow,
   .animate-hero-crest,
   .animate-hero-headline,
