@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { ArrowUpRight, ChevronLeft, ChevronRight, Gamepad2, Calendar } from 'lucide-react';
 import { sfx } from '../utils/sfx';
 
+import { safeFetchJson } from '../lib/apiHelper';
+
 interface ChooseYourGameProps {
   onSelectGame: (gameName: string) => void;
   onViewEventsForGame?: (gameName: string) => void;
@@ -28,19 +30,17 @@ export const ChooseYourGame: React.FC<ChooseYourGameProps> = ({
   const [games, setGames] = useState<DBGame[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchGames = () => {
-    fetch('/api/games')
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) {
-          setGames(data);
-        }
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error('Failed to load games from database:', err);
-        setLoading(false);
-      });
+  const fetchGames = async () => {
+    try {
+      const data = await safeFetchJson<DBGame[]>('/api/games', [], 'games');
+      if (Array.isArray(data) && data.length > 0) {
+        setGames(data);
+      }
+    } catch (err) {
+      console.warn('Failed to load games:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {

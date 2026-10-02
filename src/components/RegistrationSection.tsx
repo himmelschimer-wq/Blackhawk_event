@@ -22,6 +22,7 @@ import {
   ChevronUp 
 } from 'lucide-react';
 import { sfx } from '../utils/sfx';
+import { safeFetchJson } from '../lib/apiHelper';
 
 interface RegistrationProps {
   preSelectedGame?: string;
@@ -124,8 +125,8 @@ export const RegistrationSection: React.FC<RegistrationProps> = ({
   // Fetch games & events strictly from database
   useEffect(() => {
     Promise.all([
-      fetch('/api/games').then(res => res.json()),
-      fetch('/api/events').then(res => res.json())
+      safeFetchJson<DBGameItem[]>('/api/games', [], 'games'),
+      safeFetchJson<DBEventItem[]>('/api/events', [], 'events')
     ])
       .then(([gamesData, eventsData]: [DBGameItem[], DBEventItem[]]) => {
         if (Array.isArray(gamesData)) {

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Calendar, Trophy, AlertCircle } from 'lucide-react';
 import { sfx } from '../utils/sfx';
 import { PlayerProfileModal, type PlayerProfileData } from './PlayerProfileModal';
+import { safeFetchJson } from '../lib/apiHelper';
 
 interface UpcomingEventsAndLeaderboardProps {
   onRegisterEvent: (gameName: string, eventId?: string) => void;
@@ -67,35 +68,31 @@ export const UpcomingEventsAndLeaderboard: React.FC<UpcomingEventsAndLeaderboard
   }, [activeGameFilter]);
 
   // Fetch real events from Database API
-  const fetchEvents = () => {
-    fetch('/api/events')
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) {
-          setEvents(data);
-        }
-        setLoadingEvents(false);
-      })
-      .catch(err => {
-        console.error('Failed to load events from database:', err);
-        setLoadingEvents(false);
-      });
+  const fetchEvents = async () => {
+    try {
+      const data = await safeFetchJson<any[]>('/api/events', [], 'events');
+      if (Array.isArray(data)) {
+        setEvents(data);
+      }
+    } catch (err) {
+      console.warn('Failed to load events:', err);
+    } finally {
+      setLoadingEvents(false);
+    }
   };
 
   // Fetch real leaderboard from Database API (with server-calculated ranking)
-  const fetchLeaderboard = () => {
-    fetch('/api/leaderboard')
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) {
-          setLeaderboard(data.slice(0, 5)); // Top 5 warriors for homepage
-        }
-        setLoadingLeaderboard(false);
-      })
-      .catch(err => {
-        console.error('Failed to load leaderboard from database:', err);
-        setLoadingLeaderboard(false);
-      });
+  const fetchLeaderboard = async () => {
+    try {
+      const data = await safeFetchJson<any[]>('/api/leaderboard', [], 'leaderboard');
+      if (Array.isArray(data)) {
+        setLeaderboard(data.slice(0, 5)); // Top 5 warriors for homepage
+      }
+    } catch (err) {
+      console.warn('Failed to load leaderboard:', err);
+    } finally {
+      setLoadingLeaderboard(false);
+    }
   };
 
   useEffect(() => {

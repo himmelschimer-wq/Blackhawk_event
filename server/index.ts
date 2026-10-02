@@ -177,7 +177,7 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
 // ─── SERVER LIFECYCLE ────────────────────────────────────────────────────────
 let serverInstance: any = null;
 
-if (process.env.NODE_ENV !== 'test') {
+if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
   serverInstance = app.listen(PORT, HOST, () => {
     console.log(`[BlackHawk API] 🚀 Server running on http://${HOST}:${PORT}`);
     console.log(`[BlackHawk API] 🌍 Environment: ${NODE_ENV}`);

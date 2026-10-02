@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { sfx } from '../utils/sfx';
+import { safeFetchJson } from '../lib/apiHelper';
 
 interface HeroProps {
   onRegisterClick: () => void;
@@ -27,16 +28,17 @@ export const Hero: React.FC<HeroProps> = ({ onRegisterClick, onExploreClick }) =
 
   // Fetch real statistics directly from the database API
   useEffect(() => {
-    fetch('/api/stats')
-      .then(res => res.json())
-      .then(data => {
+    const fetchStats = async () => {
+      try {
+        const data = await safeFetchJson<DBStats | null>('/api/stats', null);
         if (data && typeof data.totalPlayers === 'number') {
           setStats(data);
         }
-      })
-      .catch(err => {
-        console.error('Failed to load database stats:', err);
-      });
+      } catch (err) {
+        console.warn('Failed to load stats:', err);
+      }
+    };
+    fetchStats();
   }, []);
 
   // Format currency
