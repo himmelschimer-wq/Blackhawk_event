@@ -248,9 +248,13 @@ export const adminApi = {
     if (!token) return { authenticated: false };
 
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 1800);
       const res = await fetch('/api/auth/me', {
-        headers: this.getAuthHeaders()
+        headers: this.getAuthHeaders(),
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
       if (res.ok) {
         const data = await res.json();
         if (data && data.authenticated) {

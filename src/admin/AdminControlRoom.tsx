@@ -67,6 +67,9 @@ export const AdminControlRoom: React.FC<AdminControlRoomProps> = ({ onExitToPubl
     window.location.hash = `#admin/${id}`;
   };
 
+  const validTabs = ['dashboard', 'calculator', 'events', 'games', 'players', 'registrations', 'leaderboard', 'database', 'settings'];
+  const resolvedTab = validTabs.includes(activeTab) ? activeTab : 'dashboard';
+
   return (
     <div className="min-h-screen bg-[#080808] text-[#E8E5DF] flex font-sans antialiased selection:bg-[#D71920] selection:text-white">
       {/* Sidebar (Desktop) */}
@@ -93,7 +96,7 @@ export const AdminControlRoom: React.FC<AdminControlRoomProps> = ({ onExitToPubl
         {/* Navigation Items (Requirement 17) */}
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
           {navItems.map((item) => {
-            const isActive = activeTab === item.id;
+            const isActive = resolvedTab === item.id;
             return (
               <button
                 key={item.id}
@@ -183,7 +186,7 @@ export const AdminControlRoom: React.FC<AdminControlRoomProps> = ({ onExitToPubl
                 key={item.id}
                 onClick={() => handleSelectTab(item.id)}
                 className={`w-full flex items-center gap-3 px-3 py-2 rounded font-tech text-xs uppercase tracking-wider font-bold ${
-                  activeTab === item.id ? 'bg-[#D71920] text-white' : 'text-zinc-400 hover:text-white'
+                  resolvedTab === item.id ? 'bg-[#D71920] text-white' : 'text-zinc-400 hover:text-white'
                 }`}
               >
                 {item.icon}
@@ -209,15 +212,15 @@ export const AdminControlRoom: React.FC<AdminControlRoomProps> = ({ onExitToPubl
 
         {/* Dynamic Submodule Viewport */}
         <main className="flex-1 p-4 sm:p-8 overflow-y-auto">
-          {activeTab === 'dashboard' && <AdminDashboard onNavigateTab={(tab) => handleSelectTab(tab)} />}
-          {activeTab === 'calculator' && <AdminPointsCalculator />}
-          {activeTab === 'events' && <AdminEvents />}
-          {activeTab === 'games' && <AdminGames />}
-          {activeTab === 'players' && <AdminPlayers />}
-          {activeTab === 'registrations' && <AdminRegistrations />}
-          {activeTab === 'leaderboard' && <AdminLeaderboard />}
-          {activeTab === 'database' && <AdminDatabaseView />}
-          {activeTab === 'settings' && <AdminSettings />}
+          {resolvedTab === 'dashboard' && <AdminDashboard onNavigateTab={(tab) => handleSelectTab(tab)} />}
+          {resolvedTab === 'calculator' && <AdminPointsCalculator />}
+          {resolvedTab === 'events' && <AdminEvents />}
+          {resolvedTab === 'games' && <AdminGames />}
+          {resolvedTab === 'players' && <AdminPlayers />}
+          {resolvedTab === 'registrations' && <AdminRegistrations />}
+          {resolvedTab === 'leaderboard' && <AdminLeaderboard />}
+          {resolvedTab === 'database' && <AdminDatabaseView />}
+          {resolvedTab === 'settings' && <AdminSettings />}
         </main>
       </div>
     </div>

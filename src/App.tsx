@@ -50,13 +50,16 @@ export function App() {
 
       // Extract sub-tab if any (e.g. /admin/events or #admin/events)
       let sub = 'dashboard';
-      if (path.startsWith('/admin/')) {
-        sub = path.replace('/admin/', '').split('/')[0];
-      } else if (hash.includes('/')) {
-        sub = hash.split('/')[1];
+      if (path.startsWith('/admin')) {
+        const parts = path.replace(/^\/admin\/?/, '').split('/');
+        if (parts[0]) sub = parts[0];
+      } else if (hash.startsWith('#admin') || hash.startsWith('#/admin')) {
+        const parts = hash.replace(/^#\/?admin\/?/, '').split('/');
+        if (parts[0]) sub = parts[0];
       }
-      if (sub === 'login') sub = 'dashboard';
-      setAdminTab(sub || 'dashboard');
+      const validTabs = ['dashboard', 'calculator', 'events', 'games', 'players', 'registrations', 'leaderboard', 'database', 'settings'];
+      if (!validTabs.includes(sub)) sub = 'dashboard';
+      setAdminTab(sub);
 
       try {
         const res = await adminApi.getMe();
@@ -198,7 +201,6 @@ export function App() {
         onNavigate={scrollToSection}
         onOpenRules={() => setIsRulesModalOpen(true)}
         onOpenAbout={() => setIsAboutModalOpen(true)}
-        onOpenAdmin={handleOpenAdmin}
       />
 
       <main className={`transition-opacity duration-300 ${siteRevealed ? 'opacity-100' : 'opacity-0'}`}>
@@ -249,7 +251,6 @@ export function App() {
           onNavigate={scrollToSection}
           onOpenRules={() => setIsRulesModalOpen(true)}
           onOpenAbout={() => setIsAboutModalOpen(true)}
-          onOpenAdmin={handleOpenAdmin}
         />
       </div>
 

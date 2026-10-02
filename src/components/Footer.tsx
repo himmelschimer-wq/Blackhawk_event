@@ -1,19 +1,16 @@
 import React from 'react';
-import { ShieldCheck, Lock } from 'lucide-react';
 import { sfx } from '../utils/sfx';
 
 interface FooterProps {
   onNavigate?: (sectionId: string) => void;
   onOpenRules?: () => void;
   onOpenAbout?: () => void;
-  onOpenAdmin?: () => void;
 }
 
 export const Footer: React.FC<FooterProps> = ({
   onNavigate,
   onOpenRules,
   onOpenAbout,
-  onOpenAdmin,
 }) => {
   const handleNavClick = (tab: 'home' | 'events' | 'games' | 'leaderboard' | 'rules' | 'about') => {
     sfx.playClick();
@@ -75,37 +72,10 @@ export const Footer: React.FC<FooterProps> = ({
                 {link.label}
               </button>
             ))}
-
-            {/* Direct Admin Link */}
-            <button
-              onClick={() => {
-                sfx.playClick();
-                if (onOpenAdmin) onOpenAdmin();
-                else window.location.hash = '#admin/dashboard';
-              }}
-              className="py-1 px-1.5 text-zinc-500 hover:text-[#ff4d4d] transition-colors cursor-pointer flex items-center gap-1"
-            >
-              <Lock className="w-3 h-3 text-[#D71920]" />
-              <span>Admin</span>
-            </button>
           </div>
 
-          {/* Right: Social Icons + Admin Trigger */}
+          {/* Right: Social Icons */}
           <div className="flex items-center gap-2.5 sm:gap-3">
-            {/* Admin Quick Icon */}
-            <button
-              onClick={() => {
-                sfx.playClick();
-                if (onOpenAdmin) onOpenAdmin();
-                else window.location.hash = '#admin/dashboard';
-              }}
-              title="Admin Command Portal (Ctrl+Shift+A)"
-              className="w-8 h-8 rounded-full bg-white/[0.03] border border-white/10 hover:border-[#D71920]/40 hover:bg-[#D71920]/10 flex items-center justify-center text-[#7a7a82] hover:text-[#ff4d4d] transition-all active:scale-95 cursor-pointer"
-              aria-label="Admin Portal"
-            >
-              <ShieldCheck className="w-3.5 h-3.5" />
-            </button>
-
             {/* Discord */}
             <a
               href="https://discord.gg/WrxHsKbHY"
