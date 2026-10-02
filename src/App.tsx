@@ -13,6 +13,7 @@ import { AdminControlRoom } from './admin/AdminControlRoom';
 import { AdminLogin } from './admin/AdminLogin';
 import { DiscordCallback } from './components/DiscordCallback';
 import { IntroSplash } from './components/IntroSplash';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { adminApi } from './lib/adminApi';
 import { type DBEventItem } from './components/UpcomingEventsAndLeaderboard';
 
@@ -27,6 +28,7 @@ export function App() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [authChecking, setAuthChecking] = useState<boolean>(true);
   const [showIntroSplash, setShowIntroSplash] = useState<boolean>(true);
+  const [siteRevealed, setSiteRevealed] = useState(false);
 
   // Modals state
   const [isRegModalOpen, setIsRegModalOpen] = useState(false);
@@ -161,23 +163,25 @@ export function App() {
     // Requirement 2: Unauthenticated /admin/* redirects to /admin/login
     if (!isAuthenticated) {
       return (
-        <AdminLogin
-          onLoginSuccess={handleAuthSuccess}
-          onExitToPublic={handleExitToPublic}
-        />
+        <ErrorBoundary fallbackTitle="ADMIN LOGIN ERROR">
+          <AdminLogin
+            onLoginSuccess={handleAuthSuccess}
+            onExitToPublic={handleExitToPublic}
+          />
+        </ErrorBoundary>
       );
     }
 
     // Authenticated admin control room
     return (
-      <AdminControlRoom
-        onExitToPublicSite={handleExitToPublic}
-        initialTab={adminTab}
-      />
+      <ErrorBoundary fallbackTitle="ADMIN CONTROL ROOM ERROR">
+        <AdminControlRoom
+          onExitToPublicSite={handleExitToPublic}
+          initialTab={adminTab}
+        />
+      </ErrorBoundary>
     );
   }
-
-  const [siteRevealed, setSiteRevealed] = useState(false);
 
   // Otherwise, render Public BlackHawk Gaming Experience
   return (
