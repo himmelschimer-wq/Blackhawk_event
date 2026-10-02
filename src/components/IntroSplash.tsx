@@ -80,7 +80,7 @@ export const IntroSplash: React.FC<IntroSplashProps> = ({
 
         {/* 3. Refined Tagline Beneath */}
         <p className="intro-tagline font-cinzel text-[10px] sm:text-xs md:text-sm font-semibold tracking-[0.28em] sm:tracking-[0.38em] uppercase text-[#a1a1aa] mt-4 sm:mt-5">
-          PLAY <span className="text-[#D71920] mx-1.5 font-bold">•</span> COMPETE <span className="text-[#D71920] mx-1.5 font-bold">•</span> DOMINATE
+          PLAY<span className="text-[#D71920]">.</span> COMPETE<span className="text-[#D71920]">.</span> DOMINATE<span className="text-[#D71920]">.</span>
         </p>
       </div>
     </div>
