@@ -249,7 +249,7 @@ export const AdminPointsCalculator: React.FC = () => {
     return registrations.find(r => r.id === selectedRegistrationId) || null;
   }, [registrations, selectedRegistrationId]);
 
-  // ─── ADD/DELETE DYNAMIC CALCULABLE KEY-VALUE METRICS ───────────────────────
+  // ─── ADD/DELETE/EDIT DYNAMIC CALCULABLE KEY-VALUE METRICS ───────────────────────
   const handleAddNewCalculableMetric = () => {
     if (!newMetricKey.trim()) {
       showNotify('Please enter a metric key name (e.g. Revives, Rounds Won).', 'error');
@@ -275,7 +275,27 @@ export const AdminPointsCalculator: React.FC = () => {
 
   const handleDeleteCalculableMetric = (metricId: string) => {
     sfx.playClick();
+    const deletedMetric = calculableMetrics.find(m => m.id === metricId);
     setCalculableMetrics(calculableMetrics.filter(m => m.id !== metricId));
+    showNotify(`Deleted calculable metric "${deletedMetric?.key || metricId}"`, 'success');
+  };
+
+  const handleResetDefaultMetrics = () => {
+    sfx.playClick();
+    const preset = DEFAULT_PRESETS[activeGamePreset] || DEFAULT_PRESETS.BGMI;
+    setCalculableMetrics([...preset.metrics]);
+    setCustomPlacementPoints({ ...preset.placementPoints });
+    showNotify(`Reset calculable metrics to ${preset.name} defaults`, 'success');
+  };
+
+  const handleClearAllMetrics = () => {
+    sfx.playClick();
+    setCalculableMetrics([]);
+    showNotify('Cleared all calculable metrics. You can now add custom scoring metrics.', 'success');
+  };
+
+  const handleUpdateMetricMultiplier = (metricId: string, newMultiplier: number) => {
+    setCalculableMetrics(prev => prev.map(m => m.id === metricId ? { ...m, multiplier: newMultiplier } : m));
   };
 
   // ─── REAL-TIME CALCULABLE METRICS COMPUTATION FOR MULTI-MATCH ───────────────
@@ -780,75 +800,122 @@ export const AdminPointsCalculator: React.FC = () => {
             </div>
 
             {/* ─── DYNAMIC CALCULABLE KEY-VALUE CARDS GRID ─── */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-tech uppercase font-bold tracking-wider text-zinc-400">
-                  CALCULABLE SCORING METRICS FOR {currentActiveMatch.matchLabel}
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-[10px] font-tech uppercase font-bold tracking-wider text-zinc-400 flex items-center gap-1.5">
+                  <Tags className="w-3.5 h-3.5 text-[#D71920]" />
+                  <span>CALCULABLE SCORING METRICS FOR {currentActiveMatch.matchLabel}</span>
                 </span>
-                <span className="text-[10px] text-zinc-500 font-mono">
-                  {calculableMetrics.length} Metric Key-Value Inputs
-                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleResetDefaultMetrics}
+                    className="text-[10px] font-tech font-bold uppercase tracking-wider text-zinc-400 hover:text-white px-2 py-1 rounded bg-white/5 hover:bg-white/10 border border-white/10 transition-colors cursor-pointer"
+                    title="Reset to default game metrics"
+                  >
+                    Reset Defaults
+                  </button>
+                  {calculableMetrics.length > 0 && (
+                    <button
+                      onClick={handleClearAllMetrics}
+                      className="text-[10px] font-tech font-bold uppercase tracking-wider text-red-400 hover:text-red-300 px-2 py-1 rounded bg-red-950/40 hover:bg-red-950/70 border border-red-500/30 transition-colors cursor-pointer"
+                      title="Clear all metrics"
+                    >
+                      Clear All
+                    </button>
+                  )}
+                  <span className="text-[10px] text-zinc-500 font-mono">
+                    {calculableMetrics.length} Active Metrics
+                  </span>
+                </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                {calculableMetrics.map((metric) => {
-                  const currentValue = currentActiveMatch.metricValues[metric.id] ?? metric.defaultValue ?? 0;
-                  const calculatedPoints = metric.type === 'rank_table'
-                    ? (customPlacementPoints[Math.max(1, Math.round(currentValue))] ?? 0)
-                    : (currentValue * metric.multiplier);
-
-                  return (
-                    <div
-                      key={metric.id}
-                      className="p-3.5 rounded-2xl bg-black/50 border border-white/10 hover:border-white/20 transition-all space-y-1.5 relative group"
+              {calculableMetrics.length === 0 ? (
+                <div className="p-6 text-center rounded-2xl bg-black/40 border border-dashed border-white/10 space-y-2">
+                  <p className="text-xs text-zinc-400 font-medium">All calculable metrics have been deleted.</p>
+                  <div className="flex items-center justify-center gap-2 pt-1">
+                    <button
+                      onClick={() => setIsAddingMetric(true)}
+                      className="px-3 py-1.5 rounded-xl bg-[#D71920] hover:bg-[#e3262e] text-white text-xs font-tech font-bold uppercase tracking-wider flex items-center gap-1.5 cursor-pointer"
                     >
-                      {/* Metric Header & Key Name */}
-                      <div className="flex items-center justify-between gap-2">
-                        <label className="text-[10px] text-zinc-300 block font-tech uppercase font-bold truncate">
-                          {metric.key}
-                        </label>
-                        {metric.isCustom && (
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Add Custom Metric</span>
+                    </button>
+                    <button
+                      onClick={handleResetDefaultMetrics}
+                      className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-tech font-bold uppercase tracking-wider cursor-pointer"
+                    >
+                      Restore Defaults
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                  {calculableMetrics.map((metric) => {
+                    const currentValue = currentActiveMatch.metricValues[metric.id] ?? metric.defaultValue ?? 0;
+                    const calculatedPoints = metric.type === 'rank_table'
+                      ? (customPlacementPoints[Math.max(1, Math.round(currentValue))] ?? 0)
+                      : (currentValue * metric.multiplier);
+
+                    return (
+                      <div
+                        key={metric.id}
+                        className="p-3.5 rounded-2xl bg-black/50 border border-white/10 hover:border-white/20 transition-all space-y-2 relative group shadow-sm"
+                      >
+                        {/* Metric Header, Key Name & Delete Button */}
+                        <div className="flex items-center justify-between gap-2">
+                          <label className="text-[10px] text-zinc-300 block font-tech uppercase font-bold truncate">
+                            {metric.key}
+                          </label>
                           <button
                             onClick={() => handleDeleteCalculableMetric(metric.id)}
-                            className="text-zinc-600 hover:text-red-400 transition-colors p-0.5"
-                            title="Remove metric"
+                            className="text-zinc-500 hover:text-red-400 transition-colors p-1 rounded hover:bg-red-950/50 cursor-pointer"
+                            title={`Delete "${metric.key}" metric`}
                           >
-                            <Trash2 className="w-3 h-3" />
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
-                        )}
-                      </div>
+                        </div>
 
-                      {/* Number Input Box */}
-                      <div className="relative">
-                        <input
-                          type="number"
-                          min={metric.type === 'rank_table' ? 1 : 0}
-                          placeholder={metric.placeholder || '0'}
-                          value={currentValue}
-                          onChange={(e) => updateCurrentMatchMetricValue(metric.id, parseFloat(e.target.value) || 0)}
-                          className="w-full bg-[#141418] border border-white/15 rounded-xl px-3 py-2 text-base text-white focus:border-[#D71920] focus:outline-none font-mono font-bold"
-                        />
-                      </div>
+                        {/* Number Input Box */}
+                        <div className="relative">
+                          <input
+                            type="number"
+                            min={metric.type === 'rank_table' ? 1 : 0}
+                            placeholder={metric.placeholder || '0'}
+                            value={currentValue}
+                            onChange={(e) => updateCurrentMatchMetricValue(metric.id, parseFloat(e.target.value) || 0)}
+                            className="w-full bg-[#141418] border border-white/15 rounded-xl px-3 py-2 text-base text-white focus:border-[#D71920] focus:outline-none font-mono font-bold"
+                          />
+                        </div>
 
-                      {/* Real-time Calculated Subtext */}
-                      <div className="flex items-center justify-between text-[10px] pt-1">
-                        <span className="text-[#ff4d4d] font-mono font-bold">
-                          = {calculatedPoints} PTS
-                        </span>
-                        {metric.type === 'multiplier' ? (
-                          <span className="text-zinc-500 font-mono text-[9.5px]">
-                            ({metric.multiplier} pt/unit)
+                        {/* Real-time Calculated Subtext & Multiplier Adjust */}
+                        <div className="flex items-center justify-between text-[10px] pt-1 border-t border-white/5">
+                          <span className="text-[#ff4d4d] font-mono font-bold">
+                            = {calculatedPoints} PTS
                           </span>
-                        ) : (
-                          <span className="text-zinc-500 font-mono text-[9.5px]">
-                            (Rank Table)
-                          </span>
-                        )}
+                          {metric.type === 'multiplier' ? (
+                            <div className="flex items-center gap-1">
+                              <span className="text-zinc-500 font-mono text-[9px]">Rate:</span>
+                              <input
+                                type="number"
+                                step="0.5"
+                                value={metric.multiplier}
+                                onChange={(e) => handleUpdateMetricMultiplier(metric.id, parseFloat(e.target.value) || 0)}
+                                className="w-12 bg-black/60 border border-white/10 rounded px-1 py-0.5 text-[10px] text-zinc-300 font-mono font-bold text-center focus:outline-none focus:border-[#D71920]"
+                                title="Edit points per unit for this metric"
+                              />
+                              <span className="text-zinc-500 font-mono text-[9px]">pt/ea</span>
+                            </div>
+                          ) : (
+                            <span className="text-zinc-500 font-mono text-[9.5px]">
+                              (Rank Table)
+                            </span>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
 

@@ -74,7 +74,7 @@ export const AdminGames: React.FC = () => {
     setFormDescription(game.description || '');
     setFormBanner(game.banner || '');
     setFormLogo(game.logo || '');
-    setFormActive(game.active === 1);
+    setFormActive(game.active === 1 || game.active === true);
     setIsModalOpen(true);
   };
 
@@ -91,7 +91,7 @@ export const AdminGames: React.FC = () => {
           description: formDescription,
           banner: formBanner,
           logo: formLogo,
-          active: formActive
+          active: formActive ? 1 : 0
         });
       } else {
         await adminApi.createGame({
@@ -102,7 +102,7 @@ export const AdminGames: React.FC = () => {
           description: formDescription,
           banner: formBanner,
           logo: formLogo,
-          active: formActive
+          active: formActive ? 1 : 0
         });
       }
       sfx.playSuccess();
@@ -117,10 +117,11 @@ export const AdminGames: React.FC = () => {
   const handleToggleActive = async (game: any) => {
     sfx.playClick();
     try {
-      await adminApi.updateGame(game.id, { active: game.active === 1 ? false : true });
+      const isCurrentlyActive = game.active === 1 || game.active === true;
+      await adminApi.updateGame(game.id, { active: isCurrentlyActive ? 0 : 1 });
       fetchGames();
     } catch (err: any) {
-      setError(err.message || 'Failed to toggle status');
+      setError(err.message || 'Failed to toggle visibility status');
     }
   };
 
@@ -199,60 +200,61 @@ export const AdminGames: React.FC = () => {
                 <th className="p-3.5">GAME TITLE</th>
                 <th className="p-3.5">CATEGORY</th>
                 <th className="p-3.5">FORMAT</th>
-                <th className="p-3.5">DEFAULT PRIZE</th>
-                <th className="p-3.5">PUBLIC STATUS</th>
+                <th className="p-3.5">LANDING PAGE VISIBILITY</th>
                 <th className="p-3.5 text-right">ACTIONS</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/[0.04]">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="py-8 text-center text-zinc-500">
+                  <td colSpan={5} className="py-8 text-center text-zinc-500">
                     <RefreshCw className="w-4 h-4 animate-spin mx-auto mb-2 text-[#D71920]" />
                     <span>Loading games from database...</span>
                   </td>
                 </tr>
               ) : filteredGames.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-8 text-center text-zinc-500">
+                  <td colSpan={5} className="py-8 text-center text-zinc-500">
                     No games found in database.
                   </td>
                 </tr>
               ) : (
-                filteredGames.map((game) => (
-                  <tr key={game.id} className="hover:bg-white/[0.015]">
-                    <td className="p-3.5 font-medium text-white flex items-center gap-3">
-                      <div className="w-8 h-8 rounded bg-zinc-900 border border-white/10 flex items-center justify-center p-1 shrink-0">
-                        <img
-                          src={game.logo || '/assets/badge_bgmi.png'}
-                          alt={game.name}
-                          className="max-h-full max-w-full object-contain"
-                          onError={(e) => ((e.target as HTMLElement).style.display = 'none')}
-                        />
-                      </div>
-                      <div>
-                        <span>{game.name}</span>
-                        <span className="block text-[10px] text-zinc-500 font-normal truncate max-w-xs">
-                          {game.description || 'No description'}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="p-3.5 text-zinc-300">{game.category}</td>
-                    <td className="p-3.5 text-zinc-400">{game.format}</td>
-                    <td className="p-3.5 font-bebas text-sm text-[#f5c464]">₹{Number(game.defaultPrizePool).toLocaleString()}</td>
-                    <td className="p-3.5">
-                      <button
-                        onClick={() => handleToggleActive(game)}
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold cursor-pointer transition-all ${
-                          game.active === 1
-                            ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-600/30'
-                            : 'bg-zinc-900 text-zinc-500 border border-zinc-700'
-                        }`}
-                      >
-                        {game.active === 1 ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
-                        <span>{game.active === 1 ? 'Active (Live)' : 'Disabled'}</span>
-                      </button>
-                    </td>
+                filteredGames.map((game) => {
+                  const isActive = game.active === 1 || game.active === true;
+                  return (
+                    <tr key={game.id} className="hover:bg-white/[0.015]">
+                      <td className="p-3.5 font-medium text-white flex items-center gap-3">
+                        <div className="w-8 h-8 rounded bg-zinc-900 border border-white/10 flex items-center justify-center p-1 shrink-0">
+                          <img
+                            src={game.logo || '/assets/badge_bgmi.png'}
+                            alt={game.name}
+                            className="max-h-full max-w-full object-contain"
+                            onError={(e) => ((e.target as HTMLElement).style.display = 'none')}
+                          />
+                        </div>
+                        <div>
+                          <span>{game.name}</span>
+                          <span className="block text-[10px] text-zinc-500 font-normal truncate max-w-xs">
+                            {game.description || 'No description'}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="p-3.5 text-zinc-300">{game.category}</td>
+                      <td className="p-3.5 text-zinc-400">{game.format}</td>
+                      <td className="p-3.5">
+                        <button
+                          onClick={() => handleToggleActive(game)}
+                          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-semibold cursor-pointer transition-all ${
+                            isActive
+                              ? 'bg-emerald-950/70 text-emerald-400 border border-emerald-500/40 hover:bg-emerald-900/60 shadow-[0_0_10px_rgba(16,185,129,0.2)]'
+                              : 'bg-zinc-900 text-zinc-500 border border-zinc-700 hover:text-zinc-300 hover:border-zinc-500'
+                          }`}
+                          title={isActive ? 'Click to disable visibility on Landing Page' : 'Click to enable visibility on Landing Page'}
+                        >
+                          {isActive ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
+                          <span>{isActive ? 'Visible on Landing Page' : 'Hidden (Disabled)'}</span>
+                        </button>
+                      </td>
                     <td className="p-3.5 text-right space-x-2">
                       <button
                         onClick={() => openEditModal(game)}
@@ -270,8 +272,9 @@ export const AdminGames: React.FC = () => {
                       </button>
                     </td>
                   </tr>
-                ))
-              )}
+                );
+              })
+            )}
             </tbody>
           </table>
         </div>
@@ -350,16 +353,6 @@ export const AdminGames: React.FC = () => {
                     className="w-full px-3 py-2 rounded bg-black/50 border border-white/10 text-white focus:outline-none focus:border-[#D71920]"
                   />
                 </div>
-              </div>
-
-              <div>
-                <label className="block font-semibold text-zinc-400 mb-1">Default Prize Pool (₹)</label>
-                <input
-                  type="number"
-                  value={formPrize}
-                  onChange={(e) => setFormPrize(Number(e.target.value))}
-                  className="w-full px-3 py-2 rounded bg-black/50 border border-white/10 text-white focus:outline-none focus:border-[#D71920]"
-                />
               </div>
 
               <div>

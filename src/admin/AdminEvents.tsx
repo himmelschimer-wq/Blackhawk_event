@@ -7,7 +7,9 @@ import {
   Search, 
   X,
   AlertCircle,
-  RefreshCw
+  RefreshCw,
+  FileText,
+  ShieldCheck
 } from 'lucide-react';
 import { sfx } from '../utils/sfx';
 
@@ -22,6 +24,7 @@ export const AdminEvents: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<any | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [previewRulesEvent, setPreviewRulesEvent] = useState<any | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Form fields
@@ -33,9 +36,10 @@ export const AdminEvents: React.FC = () => {
   const [formPrize, setFormPrize] = useState(10000);
   const [formMaxPart, setFormMaxPart] = useState(100);
   const [formRegStatus, setFormRegStatus] = useState('OPEN');
-  const [formEventStatus, setFormEventStatus] = useState('UPCOMING');
+  const [formEventStatus, setFormEventStatus] = useState('REGISTRATION OPEN');
   const [formDesc, setFormDesc] = useState('');
   const [formRules, setFormRules] = useState('');
+  const [formGeneralRules, setFormGeneralRules] = useState('');
   const [formBanner, setFormBanner] = useState('');
 
   const loadData = async () => {
@@ -74,7 +78,8 @@ export const AdminEvents: React.FC = () => {
     setFormRegStatus('OPEN');
     setFormEventStatus('REGISTRATION OPEN');
     setFormDesc('');
-    setFormRules('Standard tournament rules apply.');
+    setFormRules('1. Custom private room lobby will open 15 minutes prior.\n2. Mobile devices only; emulators, iPad view mods & triggers strictly prohibited.\n3. Squad captain must submit final score screenshot after match.');
+    setFormGeneralRules('1. Discord attendance & check-in mandatory for all roster members.\n2. Fair play strictly enforced: Instant ban for cheating or toxicity.\n3. Cash prize rewards distributed via UPI / Bank Transfer within 24-48 hours.');
     setFormBanner('/assets/official_game_bgmi.png');
     setIsModalOpen(true);
   };
@@ -93,6 +98,7 @@ export const AdminEvents: React.FC = () => {
     setFormEventStatus(event.eventStatus);
     setFormDesc(event.description || '');
     setFormRules(event.rules || '');
+    setFormGeneralRules(event.generalRules || event.general_rules || '');
     setFormBanner(event.banner || '');
     setIsModalOpen(true);
   };
@@ -117,6 +123,7 @@ export const AdminEvents: React.FC = () => {
         eventStatus: formEventStatus,
         description: formDesc,
         rules: formRules,
+        generalRules: formGeneralRules,
         banner: formBanner || (selectedGame ? selectedGame.banner : '')
       };
 
@@ -295,11 +302,18 @@ export const AdminEvents: React.FC = () => {
                         <option value="CANCELLED">CANCELLED</option>
                       </select>
                     </td>
-                    <td className="p-3.5 text-right space-x-2">
+                    <td className="p-3.5 text-right space-x-1.5">
+                      <button
+                        onClick={() => setPreviewRulesEvent(ev)}
+                        className="p-1.5 rounded hover:bg-white/10 text-zinc-400 hover:text-[#f5c464] transition-colors cursor-pointer"
+                        title="View Event Rules & Briefing"
+                      >
+                        <FileText className="w-3.5 h-3.5" />
+                      </button>
                       <button
                         onClick={() => openEditModal(ev)}
                         className="p-1.5 rounded hover:bg-white/10 text-zinc-400 hover:text-white transition-colors cursor-pointer"
-                        title="Edit Event"
+                        title="Edit Event & Rules"
                       >
                         <Edit2 className="w-3.5 h-3.5" />
                       </button>
@@ -494,6 +508,44 @@ export const AdminEvents: React.FC = () => {
                 />
               </div>
 
+              {/* Event-Specific Rules Section */}
+              <div className="pt-2 border-t border-white/10 space-y-3">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-[#D71920]" />
+                  <h4 className="font-cinzel text-xs font-bold text-white uppercase">
+                    Tournament Rules & Regulations
+                  </h4>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-zinc-300 mb-1 flex items-center justify-between">
+                    <span>Specific Game & Match Rules</span>
+                    <span className="text-[10px] text-zinc-500 font-normal">1 rule per line</span>
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={formRules}
+                    onChange={(e) => setFormRules(e.target.value)}
+                    placeholder={"1. 4-Man Squad custom room lobby.\n2. Mobile devices only; emulators, iPad view mods & triggers strictly forbidden.\n3. Squad captain must submit final score screenshot."}
+                    className="w-full px-3 py-2 rounded bg-black/50 border border-white/10 text-white font-mono text-[11px] placeholder:text-zinc-600 focus:outline-none focus:border-[#D71920]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-zinc-300 mb-1 flex items-center justify-between">
+                    <span>General Code of Conduct & Payout Protocol</span>
+                    <span className="text-[10px] text-zinc-500 font-normal">1 rule per line</span>
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={formGeneralRules}
+                    onChange={(e) => setFormGeneralRules(e.target.value)}
+                    placeholder={"1. Discord attendance & check-in mandatory 15 minutes prior to match time.\n2. Fair play strictly enforced: Instant ban for cheating or toxicity.\n3. Cash prize rewards distributed via UPI / Bank Transfer within 24-48 hours."}
+                    className="w-full px-3 py-2 rounded bg-black/50 border border-white/10 text-white font-mono text-[11px] placeholder:text-zinc-600 focus:outline-none focus:border-[#D71920]"
+                  />
+                </div>
+              </div>
+
               <div className="flex justify-end gap-2 pt-3 border-t border-white/10">
                 <button
                   type="button"
@@ -506,10 +558,74 @@ export const AdminEvents: React.FC = () => {
                   type="submit"
                   className="px-4 py-1.5 rounded bg-[#D71920] hover:bg-[#e3262e] text-white font-semibold"
                 >
-                  Save Event
+                  Save Event & Rules
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Rules Preview Dialog Modal */}
+      {previewRulesEvent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm">
+          <div className="w-full max-w-lg bg-[#0c0c0f] border border-white/10 rounded-2xl p-6 space-y-4 max-h-[85vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <div>
+                <span className="text-[10px] font-tech text-[#D71920] font-bold uppercase">
+                  {previewRulesEvent.gameName}
+                </span>
+                <h3 className="font-cinzel text-sm font-bold text-white uppercase">
+                  {previewRulesEvent.title} — Rules Briefing
+                </h3>
+              </div>
+              <button onClick={() => setPreviewRulesEvent(null)} className="text-zinc-400 hover:text-white">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs">
+              <div>
+                <h4 className="font-tech text-[11px] font-bold text-zinc-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5 text-[#D71920]" />
+                  SPECIFIC TOURNAMENT RULES
+                </h4>
+                <div className="p-3 rounded-lg bg-black/40 border border-white/10 text-zinc-300 space-y-1.5 font-mono text-[11px]">
+                  {previewRulesEvent.rules ? (
+                    previewRulesEvent.rules.split('\n').map((r: string, idx: number) => (
+                      <p key={idx} className="leading-relaxed">{r}</p>
+                    ))
+                  ) : (
+                    <p className="text-zinc-500 italic">No specific match rules configured for this event.</p>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <h4 className="font-tech text-[11px] font-bold text-zinc-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                  GENERAL CODE OF CONDUCT & PAYOUT RULES
+                </h4>
+                <div className="p-3 rounded-lg bg-black/40 border border-white/10 text-zinc-300 space-y-1.5 font-mono text-[11px]">
+                  {(previewRulesEvent.generalRules || previewRulesEvent.general_rules) ? (
+                    (previewRulesEvent.generalRules || previewRulesEvent.general_rules).split('\n').map((r: string, idx: number) => (
+                      <p key={idx} className="leading-relaxed">{r}</p>
+                    ))
+                  ) : (
+                    <p className="text-zinc-500 italic">Standard BlackHawk organization rules apply.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2 border-t border-white/10">
+              <button
+                onClick={() => setPreviewRulesEvent(null)}
+                className="px-4 py-1.5 rounded bg-white/10 hover:bg-white/20 text-white text-xs font-semibold"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}

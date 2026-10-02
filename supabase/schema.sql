@@ -344,12 +344,4 @@ VALUES
 ('scribble', 'SCRIBBLE', 'Lightning speed sketch & guess community showdown.', '/assets/badge_minecraft.png', '/assets/official_game_minecraft.png', 'PARTY & CASUAL', 150, 'SOLO', true)
 ON CONFLICT (id) DO NOTHING;
 
--- 3. Initial Premier Events Seed
-INSERT INTO public.events (id, game_id, game_name, title, description, date, time, format, prize_pool, max_participants, registration_status, event_status, rules, general_rules, banner)
-VALUES
-('ev-ff-1', 'freefire', 'FREE FIRE', 'Free Fire Squad Showdown & 1v1 Gauntlet', 'Intense squad battle royale featuring Event Winner (₹300), Random Draw (₹50), Best Performance (₹50), Highest Eliminations (₹100), and the Double or -₹100 1v1 Challenge (₹200).', 'OCT 15, 2026', '7:00 PM', 'SQUAD & 1v1', 700, 48, 'OPEN', 'REGISTRATION OPEN', '1. 4-Man Squad custom room + optional 1v1 Gauntlet showdown.\n2. Mobile devices only.\n3. Character skills & loadouts are permitted.', '1. Discord check-in mandatory 15 minutes before match.\n2. Fair play enforced.\n3. UPI payouts within 24-48 hours.', '/assets/official_game_freefire.png'),
-('ev-bgmi-1', 'bgmi', 'BGMI', 'BGMI Squad Erangel Clash', 'Premier squad battle royale tournament across Erangel and Miramar.', 'OCT 12, 2026', '6:00 PM', 'SQUAD', 350, 64, 'OPEN', 'REGISTRATION OPEN', '1. Squad custom room lobby.\n2. Mobile devices only.\n3. Squad captain must submit end-game screenshot.', '1. Discord check-in mandatory.\n2. Zero tolerance for hacking.\n3. Transparent prize payouts.', '/assets/official_game_bgmi.png'),
-('ev-val-1', 'valorant', 'VALORANT', 'Valorant 5v5 Spike Rush Cup', 'Single elimination bracket 5v5 spike plant competitive tournament.', 'OCT 18, 2026', '6:00 PM', '5v5', 20000, 16, 'OPEN', 'REGISTRATION OPEN', '1. 5v5 Spike Plant competitive custom tournament mode.\n2. Riot Vanguard active.\n3. Tactical timeouts permitted.', '1. Discord voice rooms used for team comms.\n2. Sportsmanship enforced.\n3. Instant prize distribution.', '/assets/official_game_valorant.png'),
-('ev-mc-1', 'minecraft', 'MINECRAFT', 'Minecraft Build Battle & Survival', 'Fast-paced theme building and PvP survival gauntlet.', 'OCT 20, 2026', '5:00 PM', 'SOLO', 350, 32, 'OPEN', 'REGISTRATION OPEN', '1. Custom vanilla server with anti-cheat.\n2. No hacked clients or X-ray mods.', '1. Join Discord voice channels.\n2. Fair play rules apply.', '/assets/official_game_minecraft.png')
-ON CONFLICT (id) DO NOTHING;
 

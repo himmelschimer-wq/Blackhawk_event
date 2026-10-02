@@ -40,7 +40,7 @@ export interface DBGameItem {
   category?: string;
   defaultPrizePool?: number;
   format?: string;
-  active?: number;
+  active?: number | boolean;
 }
 
 export interface DBEventItem {
@@ -130,7 +130,7 @@ export const RegistrationSection: React.FC<RegistrationProps> = ({
     ])
       .then(([gamesData, eventsData]: [DBGameItem[], DBEventItem[]]) => {
         if (Array.isArray(gamesData)) {
-          const activeGames = gamesData.filter(g => g.active === undefined || g.active === 1);
+          const activeGames = gamesData.filter(g => g.active === 1 || g.active === true);
           setDbGames(activeGames);
 
           if (Array.isArray(eventsData)) {

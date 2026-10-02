@@ -19,7 +19,7 @@ export interface DBGame {
   category?: string;
   defaultPrizePool?: number;
   format?: string;
-  active: number;
+  active?: number | boolean;
 }
 
 export const ChooseYourGame: React.FC<ChooseYourGameProps> = ({ 
@@ -33,8 +33,10 @@ export const ChooseYourGame: React.FC<ChooseYourGameProps> = ({
   const fetchGames = async () => {
     try {
       const data = await safeFetchJson<DBGame[]>('/api/games', [], 'games');
-      if (Array.isArray(data) && data.length > 0) {
-        setGames(data);
+      if (Array.isArray(data)) {
+        // Strict filter: only show games that are active (1 or true)
+        const activeGames = data.filter(g => g.active === 1 || g.active === true);
+        setGames(activeGames);
       }
     } catch (err) {
       console.warn('Failed to load games:', err);
