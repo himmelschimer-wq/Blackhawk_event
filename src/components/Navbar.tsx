@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Menu, X, Flame } from 'lucide-react';
+import { Menu, X, Flame, ShieldCheck } from 'lucide-react';
 import { sfx } from '../utils/sfx';
 
 interface NavbarProps {
@@ -7,6 +7,7 @@ interface NavbarProps {
   onNavigate?: (sectionId: string) => void;
   onOpenRules?: () => void;
   onOpenAbout?: () => void;
+  onOpenAdmin?: () => void;
   isRevealed?: boolean;
 }
 
@@ -15,6 +16,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onNavigate,
   onOpenRules,
   onOpenAbout,
+  onOpenAdmin,
   isRevealed = true,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -221,7 +223,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             })}
 
             {/* Quick Actions Footer inside Drawer */}
-            <div className="pt-3 mt-2 border-t border-white/10">
+            <div className="pt-3 mt-2 border-t border-white/10 space-y-2">
               <a
                 href="https://discord.gg/WrxHsKbHY"
                 target="_blank"
@@ -234,6 +236,20 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </svg>
                 <span>Discord</span>
               </a>
+
+              <button
+                type="button"
+                onClick={() => {
+                  sfx.playClick();
+                  setIsOpen(false);
+                  if (onOpenAdmin) onOpenAdmin();
+                  else window.location.hash = '#admin/dashboard';
+                }}
+                className="w-full py-2.5 px-3 rounded-lg bg-white/[0.03] border border-white/10 text-zinc-400 hover:text-white text-xs font-semibold flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer"
+              >
+                <ShieldCheck className="w-3.5 h-3.5 text-[#D71920]" />
+                <span>Admin Portal</span>
+              </button>
             </div>
           </div>
         </div>

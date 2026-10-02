@@ -105,6 +105,8 @@ export function App() {
   }, []);
 
   const handleOpenAdmin = () => {
+    setIsAdminRoute(true);
+    setAdminTab('dashboard');
     window.location.hash = '#admin/dashboard';
     checkCurrentRouteAndAuth();
   };
@@ -196,6 +198,7 @@ export function App() {
         onNavigate={scrollToSection}
         onOpenRules={() => setIsRulesModalOpen(true)}
         onOpenAbout={() => setIsAboutModalOpen(true)}
+        onOpenAdmin={handleOpenAdmin}
       />
 
       <main className={`transition-opacity duration-300 ${siteRevealed ? 'opacity-100' : 'opacity-0'}`}>
@@ -246,6 +249,7 @@ export function App() {
           onNavigate={scrollToSection}
           onOpenRules={() => setIsRulesModalOpen(true)}
           onOpenAbout={() => setIsAboutModalOpen(true)}
+          onOpenAdmin={handleOpenAdmin}
         />
       </div>
 

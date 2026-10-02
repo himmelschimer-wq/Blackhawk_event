@@ -68,14 +68,14 @@ export const IntroSplash: React.FC<IntroSplashProps> = ({
         
         {/* 1. Primary Title: Mask Wipe Left-to-Right */}
         <div className="intro-title-wrapper overflow-hidden my-1 sm:my-2">
-          <h1 className="intro-title font-cinzel font-black text-4xl sm:text-6xl md:text-7xl lg:text-8xl tracking-[0.16em] sm:tracking-[0.22em] uppercase text-white leading-none">
+          <h1 className="intro-title font-cinzel font-black text-3xl sm:text-4xl md:text-5xl lg:text-5xl tracking-[0.18em] sm:tracking-[0.26em] uppercase text-white leading-none">
             <span>BLACK</span>
             <span className="text-[#D71920] ml-1">HAWK</span>
           </h1>
         </div>
 
         {/* 2. Subtitle Animated Below BLACKHAWK */}
-        <p className="intro-subtitle text-[10px] sm:text-xs md:text-[13px] font-medium tracking-[0.32em] sm:tracking-[0.42em] uppercase text-[#8e8e93] mt-3 sm:mt-4">
+        <p className="intro-subtitle text-[9px] sm:text-[11px] md:text-xs font-semibold tracking-[0.26em] sm:tracking-[0.34em] uppercase text-[#8e8e93] mt-2.5 sm:mt-3.5">
           COMMUNITY TOURNAMENTS &amp; GAMING
         </p>
       </div>
