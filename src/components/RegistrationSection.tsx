@@ -209,45 +209,58 @@ export const RegistrationSection: React.FC<RegistrationProps> = ({
     }
   }, [preSelectedGame, preSelectedEventId, dbGames, dbEvents]);
 
-  // Toggle game selection
-  const toggleGame = (gameName: string) => {
-    sfx.playClick();
-    const game = dbGames.find(g => g.name === gameName);
-    const relatedEvents = dbEvents.filter(
-      e => e.gameName?.toLowerCase() === gameName.toLowerCase() || (game && e.gameId?.toLowerCase() === game.id.toLowerCase())
-    );
+  const [gameFilter, setGameFilter] = useState<string>('ALL');
 
-    setSelectedGames(prev => {
-      if (prev.includes(gameName)) {
-        // Remove game and its events
-        setSelectedEventIds(evPrev => evPrev.filter(id => !relatedEvents.some(re => re.id === id)));
-        return prev.filter(g => g !== gameName);
-      } else {
-        // Add game and auto-select its events
-        setSelectedEventIds(evPrev => Array.from(new Set([...evPrev, ...relatedEvents.map(re => re.id)])));
-        return [...prev, gameName];
-      }
-    });
-  };
+  // Combine real database events with fallback tournament passes
+  const allEventsList: DBEventItem[] = dbEvents.length > 0
+    ? dbEvents
+    : dbGames.map(g => ({
+        id: `ev-${g.id}-open`,
+        gameId: g.id,
+        gameName: g.name,
+        title: `${g.name} Tournament Open Pass`,
+        description: g.description,
+        date: 'OCTOBER 2026',
+        time: '6:00 PM',
+        format: g.format || 'Solo',
+        prizePool: g.defaultPrizePool || 350,
+        maxParticipants: 100,
+        registrationStatus: 'OPEN'
+      }));
+
+  const displayedEvents = gameFilter === 'ALL'
+    ? allEventsList
+    : allEventsList.filter(e => 
+        (e.gameName || '').toLowerCase() === gameFilter.toLowerCase() ||
+        (e.gameId || '').toLowerCase() === gameFilter.toLowerCase()
+      );
 
   // Toggle specific event selection
-  const toggleEvent = (eventId: string, gameName: string) => {
+  const toggleEvent = (eventId: string, fallbackGameName: string) => {
     sfx.playClick();
     setSelectedEventIds(prev => {
-      if (prev.includes(eventId)) {
-        return prev.filter(id => id !== eventId);
-      } else {
-        // Also ensure parent game is selected
-        if (!selectedGames.includes(gameName)) {
-          setSelectedGames(gPrev => [...gPrev, gameName]);
-        }
-        return [...prev, eventId];
-      }
+      const isCurrentlySelected = prev.includes(eventId);
+      const updatedEventIds = isCurrentlySelected
+        ? prev.filter(id => id !== eventId)
+        : [...prev, eventId];
+
+      // Sync selectedGames with active selected events
+      const activeGameNames = Array.from(
+        new Set(
+          updatedEventIds.map(id => {
+            const ev = allEventsList.find(e => e.id === id);
+            return ev ? ev.gameName : fallbackGameName;
+          }).filter(Boolean)
+        )
+      );
+      setSelectedGames(activeGameNames);
+
+      return updatedEventIds;
     });
   };
 
-  // Smart toggle: Select all or Deselect all
-  const isAllSelected = dbGames.length > 0 && selectedGames.length === dbGames.length;
+  // Smart toggle: Select all or Deselect all events
+  const isAllSelected = allEventsList.length > 0 && selectedEventIds.length === allEventsList.length;
 
   const toggleSelectAll = () => {
     sfx.playClick();
@@ -255,8 +268,8 @@ export const RegistrationSection: React.FC<RegistrationProps> = ({
       setSelectedGames([]);
       setSelectedEventIds([]);
     } else {
-      setSelectedGames(dbGames.map(g => g.name));
-      setSelectedEventIds(dbEvents.map(e => e.id));
+      setSelectedEventIds(allEventsList.map(e => e.id));
+      setSelectedGames(Array.from(new Set(allEventsList.map(e => e.gameName).filter(Boolean))));
     }
   };
 
@@ -268,16 +281,16 @@ export const RegistrationSection: React.FC<RegistrationProps> = ({
     }));
   };
 
-  // Calculate real total prize pool from database games & events
-  const totalSelectedPrize = selectedGames.reduce((acc, gameName) => {
-    const item = dbGames.find(g => g.name === gameName);
-    return acc + (item ? (item.defaultPrizePool || 0) : 0);
+  // Calculate real total prize pool from selected events
+  const totalSelectedPrize = selectedEventIds.reduce((acc, eventId) => {
+    const ev = allEventsList.find(e => e.id === eventId);
+    return acc + (ev ? (ev.prizePool || 0) : 0);
   }, 0);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (selectedGames.length === 0) {
-      alert("Please select at least one tournament game discipline to register.");
+    if (selectedEventIds.length === 0 && selectedGames.length === 0) {
+      alert("Please select at least one tournament event to register.");
       return;
     }
 
@@ -290,71 +303,107 @@ export const RegistrationSection: React.FC<RegistrationProps> = ({
     setIsSubmitting(true);
 
     try {
-      // Build registration entries mapped to selected games & specific events
+      // Build registration entries mapped to selected events
       const entries: any[] = [];
+      const selectedEvents = allEventsList.filter(e => selectedEventIds.includes(e.id));
 
-      for (const gameName of selectedGames) {
-        const game = dbGames.find(g => g.name === gameName);
-        const gameId = game ? game.id : gameName.toLowerCase().replace(/[^a-z0-9]/g, '-');
-        const gameSpecificDetails: Record<string, string> = {};
-        let playType = game?.format || 'Solo';
-        let teamName: string | undefined;
-        let teamMembers: string | undefined;
+      if (selectedEvents.length > 0) {
+        for (const ev of selectedEvents) {
+          const game = dbGames.find(
+            g => g.name.toLowerCase() === (ev.gameName || '').toLowerCase() || g.id === ev.gameId
+          );
+          const gameName = ev.gameName || game?.name || 'Tournament Event';
+          const gameId = ev.gameId || (game ? game.id : gameName.toLowerCase().replace(/[^a-z0-9]/g, '-'));
+          const gameSpecificDetails: Record<string, string> = {};
+          let playType = ev.format || game?.format || 'Solo';
+          let teamName: string | undefined;
+          let teamMembers: string | undefined;
 
-        const gnUpper = gameName.toUpperCase();
-
-        if (gnUpper.includes('FREE FIRE')) {
-          gameSpecificDetails['Free Fire UID'] = ffUid || 'N/A';
-          gameSpecificDetails['In-Game Name'] = ffIgn || gamerTag;
-          playType = ffPlayType;
-          if (ffPlayType === 'Team / Squad') {
-            teamName = ffTeamName;
-            teamMembers = ffTeamMembers;
+          const gnUpper = gameName.toUpperCase();
+          if (gnUpper.includes('FREE FIRE')) {
+            gameSpecificDetails['Free Fire UID'] = ffUid || 'N/A';
+            gameSpecificDetails['In-Game Name'] = ffIgn || gamerTag;
+            playType = ffPlayType;
+            if (ffPlayType === 'Team / Squad') {
+              teamName = ffTeamName;
+              teamMembers = ffTeamMembers;
+            }
+          } else if (gnUpper.includes('BGMI')) {
+            gameSpecificDetails['BGMI UID'] = bgmiUid || 'N/A';
+            gameSpecificDetails['In-Game Name'] = bgmiIgn || gamerTag;
+            playType = 'Team / Squad';
+            teamName = bgmiTeamName;
+            teamMembers = bgmiTeamMembers;
+          } else if (gnUpper.includes('VALORANT')) {
+            gameSpecificDetails['Riot ID'] = valRiotId || gamerTag;
+            gameSpecificDetails['Rank'] = valRank;
+            playType = 'Team / Squad';
+            teamName = valTeamName || `${gamerTag}'s 5v5 Squad`;
+          } else if (gnUpper.includes('MINECRAFT')) {
+            gameSpecificDetails['Minecraft Username'] = mcUsername || gamerTag;
+            gameSpecificDetails['Edition'] = mcEdition;
+            playType = mcPlayType;
+            if (mcPlayType === 'Team / Squad') {
+              teamName = mcTeamName;
+              teamMembers = mcTeamMembers;
+            }
+          } else {
+            gameSpecificDetails['In-Game Handle'] = gamerTag;
           }
-        } else if (gnUpper.includes('BGMI')) {
-          gameSpecificDetails['BGMI UID'] = bgmiUid || 'N/A';
-          gameSpecificDetails['In-Game Name'] = bgmiIgn || gamerTag;
-          playType = 'Team / Squad';
-          teamName = bgmiTeamName;
-          teamMembers = bgmiTeamMembers;
-        } else if (gnUpper.includes('VALORANT')) {
-          gameSpecificDetails['Riot ID'] = valRiotId || gamerTag;
-          gameSpecificDetails['Rank'] = valRank;
-          playType = 'Team / Squad';
-          teamName = valTeamName || `${gamerTag}'s 5v5 Squad`;
-        } else if (gnUpper.includes('MINECRAFT')) {
-          gameSpecificDetails['Minecraft Username'] = mcUsername || gamerTag;
-          gameSpecificDetails['Edition'] = mcEdition;
-          playType = mcPlayType;
-          if (mcPlayType === 'Team / Squad') {
-            teamName = mcTeamName;
-            teamMembers = mcTeamMembers;
-          }
-        } else {
-          gameSpecificDetails['In-Game Handle'] = gamerTag;
-          playType = game?.format || 'Solo';
+
+          entries.push({
+            gameId,
+            gameName,
+            eventId: ev.id,
+            eventTitle: ev.title,
+            playType,
+            teamName,
+            teamMembers,
+            gameSpecificDetails
+          });
         }
+      } else {
+        // Fallback if games were selected directly
+        for (const gameName of selectedGames) {
+          const game = dbGames.find(g => g.name === gameName);
+          const gameId = game ? game.id : gameName.toLowerCase().replace(/[^a-z0-9]/g, '-');
+          const gameSpecificDetails: Record<string, string> = {};
+          let playType = game?.format || 'Solo';
+          let teamName: string | undefined;
+          let teamMembers: string | undefined;
 
-        // Check if there are specific events selected for this game
-        const gameEvents = dbEvents.filter(
-          e => e.gameName?.toLowerCase() === gameName.toLowerCase() || (game && e.gameId?.toLowerCase() === game.id.toLowerCase())
-        );
-        const selectedGameEvents = gameEvents.filter(e => selectedEventIds.includes(e.id));
-
-        if (selectedGameEvents.length > 0) {
-          for (const ev of selectedGameEvents) {
-            entries.push({
-              gameId,
-              gameName,
-              eventId: ev.id,
-              eventTitle: ev.title,
-              playType: ev.format || playType,
-              teamName,
-              teamMembers,
-              gameSpecificDetails
-            });
+          const gnUpper = gameName.toUpperCase();
+          if (gnUpper.includes('FREE FIRE')) {
+            gameSpecificDetails['Free Fire UID'] = ffUid || 'N/A';
+            gameSpecificDetails['In-Game Name'] = ffIgn || gamerTag;
+            playType = ffPlayType;
+            if (ffPlayType === 'Team / Squad') {
+              teamName = ffTeamName;
+              teamMembers = ffTeamMembers;
+            }
+          } else if (gnUpper.includes('BGMI')) {
+            gameSpecificDetails['BGMI UID'] = bgmiUid || 'N/A';
+            gameSpecificDetails['In-Game Name'] = bgmiIgn || gamerTag;
+            playType = 'Team / Squad';
+            teamName = bgmiTeamName;
+            teamMembers = bgmiTeamMembers;
+          } else if (gnUpper.includes('VALORANT')) {
+            gameSpecificDetails['Riot ID'] = valRiotId || gamerTag;
+            gameSpecificDetails['Rank'] = valRank;
+            playType = 'Team / Squad';
+            teamName = valTeamName || `${gamerTag}'s 5v5 Squad`;
+          } else if (gnUpper.includes('MINECRAFT')) {
+            gameSpecificDetails['Minecraft Username'] = mcUsername || gamerTag;
+            gameSpecificDetails['Edition'] = mcEdition;
+            playType = mcPlayType;
+            if (mcPlayType === 'Team / Squad') {
+              teamName = mcTeamName;
+              teamMembers = mcTeamMembers;
+            }
+          } else {
+            gameSpecificDetails['In-Game Handle'] = gamerTag;
           }
-        } else {
+
           entries.push({
             gameId,
             gameName,
@@ -474,12 +523,12 @@ export const RegistrationSection: React.FC<RegistrationProps> = ({
   };
 
   const getGameIcon = (name: string) => {
-    const n = name.toUpperCase();
-    if (n.includes('FREE FIRE')) return <Flame className="w-5 h-5 text-[#ff2a2a]" />;
-    if (n.includes('BGMI')) return <Crosshair className="w-5 h-5 text-[#ff2a2a]" />;
-    if (n.includes('VALORANT')) return <Crosshair className="w-5 h-5 text-[#D71920]" />;
-    if (n.includes('MINECRAFT')) return <ShieldAlert className="w-5 h-5 text-[#ff2a2a]" />;
-    return <Gamepad2 className="w-5 h-5 text-[#ff2a2a]" />;
+    const n = (name || '').toUpperCase();
+    if (n.includes('FREE FIRE')) return <Flame className="w-4 h-4 text-[#ff2a2a]" />;
+    if (n.includes('BGMI')) return <Crosshair className="w-4 h-4 text-[#ff2a2a]" />;
+    if (n.includes('VALORANT')) return <Crosshair className="w-4 h-4 text-[#D71920]" />;
+    if (n.includes('MINECRAFT')) return <ShieldAlert className="w-4 h-4 text-[#ff2a2a]" />;
+    return <Gamepad2 className="w-4 h-4 text-[#ff2a2a]" />;
   };
 
   return (
@@ -494,7 +543,7 @@ export const RegistrationSection: React.FC<RegistrationProps> = ({
           </div>
 
           <h2 className="font-cinzel font-bold text-lg sm:text-2xl text-white uppercase tracking-tight">
-            SELECT <span className="text-[#D71920]">DISCIPLINES & REGISTER</span>
+            SELECT <span className="text-[#D71920]">TOURNAMENT EVENTS & REGISTER</span>
           </h2>
         </div>
 
@@ -502,12 +551,12 @@ export const RegistrationSection: React.FC<RegistrationProps> = ({
         {!confirmedPass ? (
           <div className="bg-[#0c0c10] border border-white/10 rounded-xl sm:rounded-2xl p-3 sm:p-5 shadow-[0_0_30px_rgba(0,0,0,0.8)] relative">
             
-            {/* Step 1: Select One or Multiple Games from Real Database */}
+            {/* Step 1: Select One or Multiple Events from Real Database */}
             <div className="mb-4 sm:mb-5">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-2 border-b border-white/10 mb-2.5 gap-2">
                 <span className="font-tech text-xs uppercase tracking-widest text-zinc-300 font-bold flex items-center gap-1.5">
                   <span className="w-4 h-4 rounded-full bg-[#D71920] text-white flex items-center justify-center text-[10px] font-bold">1</span>
-                  CHOOSE TOURNAMENT GAMES
+                  CHOOSE TOURNAMENT EVENTS
                 </span>
                 
                 <div className="flex items-center gap-2">
@@ -524,74 +573,55 @@ export const RegistrationSection: React.FC<RegistrationProps> = ({
                     ) : (
                       <>
                         <Check className="w-3 h-3" />
-                        <span>SELECT ALL ({dbGames.length})</span>
+                        <span>SELECT ALL ({allEventsList.length})</span>
                       </>
                     )}
                   </button>
                   <span className="text-[10px] font-tech text-emerald-400 font-bold uppercase bg-emerald-950/60 border border-emerald-500/30 px-2 py-0.5 rounded">
-                    {selectedGames.length} OF {dbGames.length} DISCIPLINES SELECTED
+                    {selectedEventIds.length} OF {allEventsList.length} EVENTS SELECTED {totalSelectedPrize > 0 && `(₹${totalSelectedPrize.toLocaleString()})`}
                   </span>
                 </div>
               </div>
 
-              {/* Game Cards Grid (Loaded strictly from Database) */}
-              {loadingGames ? (
-                <div className="py-4 text-center text-zinc-500 font-tech text-xs">
-                  Loading available games from database...
-                </div>
-              ) : dbGames.length === 0 ? (
-                <div className="py-4 text-center text-zinc-500 font-tech text-xs">
-                  No active games found in the database.
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {/* Game Discipline Filter Tabs */}
+              {dbGames.length > 0 && (
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-2 mb-3 scrollbar-none">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sfx.playClick();
+                      setGameFilter('ALL');
+                    }}
+                    className={`px-3 py-1 rounded-full text-[11px] font-tech font-bold uppercase tracking-wider transition-all shrink-0 cursor-pointer ${
+                      gameFilter === 'ALL'
+                        ? 'bg-[#D71920] text-white shadow-[0_0_10px_rgba(215,25,32,0.4)]'
+                        : 'bg-white/5 border border-white/10 text-zinc-400 hover:text-white hover:bg-white/10'
+                    }`}
+                  >
+                    ALL EVENTS ({allEventsList.length})
+                  </button>
                   {dbGames.map((g) => {
-                    const isSelected = selectedGames.includes(g.name);
+                    const count = allEventsList.filter(
+                      e => (e.gameName || '').toLowerCase() === g.name.toLowerCase() || (e.gameId || '').toLowerCase() === g.id.toLowerCase()
+                    ).length;
+                    const isActive = gameFilter.toLowerCase() === g.name.toLowerCase() || gameFilter.toLowerCase() === g.id.toLowerCase();
                     return (
                       <button
                         key={g.id}
                         type="button"
-                        onClick={() => toggleGame(g.name)}
-                        onMouseEnter={() => sfx.playHover()}
-                        className={`p-2 rounded-lg border text-left transition-all duration-150 flex items-center justify-between cursor-pointer relative group ${
-                          isSelected
-                            ? 'bg-gradient-to-r from-[#220a0a] to-[#120707] border-[#D71920] shadow-[0_0_12px_rgba(215,25,32,0.35)] ring-1 ring-[#D71920]'
-                            : 'bg-[#09090d] border-white/10 hover:border-white/20 hover:bg-[#0e0e14]'
+                        onClick={() => {
+                          sfx.playClick();
+                          setGameFilter(g.name);
+                        }}
+                        className={`px-3 py-1 rounded-full text-[11px] font-tech font-bold uppercase tracking-wider transition-all shrink-0 cursor-pointer flex items-center gap-1.5 ${
+                          isActive
+                            ? 'bg-[#D71920] text-white shadow-[0_0_10px_rgba(215,25,32,0.4)]'
+                            : 'bg-white/5 border border-white/10 text-zinc-400 hover:text-white hover:bg-white/10'
                         }`}
                       >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div className="w-7 h-7 rounded bg-black/60 border border-white/10 flex items-center justify-center p-1 shrink-0">
-                            {g.logo ? (
-                              <img
-                                src={g.logo}
-                                alt={g.name}
-                                className="max-h-full max-w-full object-contain"
-                                onError={(e) => {
-                                  (e.target as HTMLElement).style.display = 'none';
-                                }}
-                              />
-                            ) : (
-                              getGameIcon(g.name)
-                            )}
-                          </div>
-                          <div className="min-w-0 truncate">
-                            <h4 className={`font-cinzel font-bold text-xs sm:text-sm uppercase leading-tight truncate ${
-                              isSelected ? 'text-white' : 'text-zinc-300'
-                            }`}>
-                              {g.name}
-                            </h4>
-                            <span className="text-[9px] font-tech text-zinc-400 font-bold block leading-none mt-0.5 truncate uppercase">
-                              {g.category || g.format || 'OFFICIAL'}
-                            </span>
-                          </div>
-                        </div>
-
-                        <span className={`text-[9px] font-tech font-bold px-1.5 py-0.5 rounded uppercase shrink-0 ml-1 ${
-                          isSelected 
-                            ? 'bg-[#D71920] text-white shadow-sm' 
-                            : 'bg-white/5 text-zinc-500 group-hover:text-zinc-300'
-                        }`}>
-                          {isSelected ? 'IN' : '+'}
+                        <span>{g.name}</span>
+                        <span className="text-[9px] px-1 py-0.2 rounded bg-black/40 text-zinc-300 font-mono">
+                          {count}
                         </span>
                       </button>
                     );
@@ -599,70 +629,86 @@ export const RegistrationSection: React.FC<RegistrationProps> = ({
                 </div>
               )}
 
-              {/* Upcoming Events for Selected Games */}
-              {selectedGames.length > 0 && dbEvents.length > 0 && (
-                <div className="mt-4 pt-3 border-t border-white/10 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="font-tech text-xs uppercase tracking-wider text-zinc-300 font-bold flex items-center gap-1.5">
-                      <Trophy className="w-3.5 h-3.5 text-[#D71920]" />
-                      UPCOMING TOURNAMENT EVENTS ({selectedEventIds.length} SELECTED)
-                    </span>
-                    <span className="text-[10px] font-tech text-zinc-400">
-                      SELECT MATCHES YOU ARE PARTICIPATING IN
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {dbEvents
-                      .filter(e => selectedGames.some(sg => sg.toLowerCase() === e.gameName?.toLowerCase() || (e.gameId && sg.toLowerCase().includes(e.gameId.toLowerCase()))))
-                      .map((ev) => {
-                        const isEvSelected = selectedEventIds.includes(ev.id);
-                        return (
-                          <div
-                            key={ev.id}
-                            onClick={() => toggleEvent(ev.id, ev.gameName)}
-                            className={`p-2.5 rounded-lg border text-left transition-all cursor-pointer flex items-center justify-between gap-2 group ${
-                              isEvSelected
-                                ? 'bg-gradient-to-r from-[#1f0a0a] to-[#0d0909] border-[#D71920]/80 shadow-[0_0_10px_rgba(215,25,32,0.25)]'
-                                : 'bg-black/40 border-white/10 hover:border-white/20 hover:bg-white/[0.02]'
-                            }`}
-                          >
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-2 mb-0.5">
-                                <span className="px-1.5 py-0.5 rounded bg-white/10 text-[9px] font-tech text-zinc-300 font-bold uppercase">
-                                  {ev.gameName}
-                                </span>
-                                <span className="text-[9px] font-tech text-[#ff4d4d] font-bold uppercase">
-                                  {ev.format}
-                                </span>
-                              </div>
-                              <h5 className="font-cinzel text-xs sm:text-sm font-bold text-white truncate leading-snug">
-                                {ev.title}
-                              </h5>
-                              <div className="flex items-center gap-3 text-[10px] text-zinc-400 mt-1 font-tech">
-                                <span>📅 {ev.date}</span>
-                                <span className="text-[#f5c464] font-bold">₹{(ev.prizePool || 0).toLocaleString()}</span>
-                              </div>
+              {/* Tournament Events Grid */}
+              {loadingGames ? (
+                <div className="py-8 text-center text-zinc-500 font-tech text-xs">
+                  Loading available tournament events from database...
+                </div>
+              ) : displayedEvents.length === 0 ? (
+                <div className="py-8 text-center text-zinc-500 font-tech text-xs border border-dashed border-white/10 rounded-xl">
+                  No active tournament events found for this filter.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {displayedEvents.map((ev) => {
+                    const isSelected = selectedEventIds.includes(ev.id);
+                    return (
+                      <div
+                        key={ev.id}
+                        onClick={() => toggleEvent(ev.id, ev.gameName)}
+                        onMouseEnter={() => sfx.playHover()}
+                        className={`p-3 rounded-xl border text-left transition-all duration-200 flex flex-col justify-between cursor-pointer relative group ${
+                          isSelected
+                            ? 'bg-gradient-to-r from-[#220a0a] to-[#120707] border-[#D71920] shadow-[0_0_15px_rgba(215,25,32,0.35)] ring-1 ring-[#D71920]'
+                            : 'bg-[#09090d] border-white/10 hover:border-white/20 hover:bg-[#0e0e14]'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="w-8 h-8 rounded-lg bg-black/60 border border-white/10 flex items-center justify-center p-1.5 shrink-0">
+                              {getGameIcon(ev.gameName)}
                             </div>
-
-                            <div className={`w-5 h-5 rounded flex items-center justify-center shrink-0 border transition-all ${
-                              isEvSelected 
-                                ? 'bg-[#D71920] border-[#D71920] text-white' 
-                                : 'border-white/20 bg-black/60 text-transparent group-hover:border-white/40'
-                            }`}>
-                              <Check className="w-3.5 h-3.5" />
+                            <div className="min-w-0">
+                              <span className="px-1.5 py-0.5 rounded bg-white/10 text-[9px] font-tech text-[#ff4d4d] font-bold uppercase tracking-wider inline-block">
+                                {ev.gameName}
+                              </span>
+                              <h4 className={`font-cinzel font-bold text-xs sm:text-sm uppercase leading-tight truncate mt-0.5 ${
+                                isSelected ? 'text-white' : 'text-zinc-200'
+                              }`}>
+                                {ev.title}
+                              </h4>
                             </div>
                           </div>
-                        );
-                      })}
-                  </div>
+
+                          <div className={`w-5 h-5 rounded flex items-center justify-center shrink-0 border transition-all ${
+                            isSelected 
+                              ? 'bg-[#D71920] border-[#D71920] text-white shadow-sm' 
+                              : 'border-white/20 bg-black/60 text-transparent group-hover:border-white/40'
+                          }`}>
+                            <Check className="w-3.5 h-3.5" />
+                          </div>
+                        </div>
+
+                        {ev.description && (
+                          <p className="text-[11px] text-zinc-400 font-sans line-clamp-1 mb-2">
+                            {ev.description}
+                          </p>
+                        )}
+
+                        <div className="flex items-center justify-between pt-2 border-t border-white/5 text-[10px] font-tech">
+                          <div className="flex items-center gap-2.5 text-zinc-400">
+                            <span className="flex items-center gap-1">
+                              <span>📅</span> {ev.date || 'TBA'}
+                            </span>
+                            <span className="px-1.5 py-0.2 rounded bg-white/5 border border-white/10 uppercase text-zinc-300">
+                              {ev.format || 'Standard'}
+                            </span>
+                          </div>
+
+                          <div className="text-[#f5c464] font-bold text-[11px]">
+                            ₹{(ev.prizePool || 0).toLocaleString()}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
 
-              {selectedGames.length === 0 && (
+              {selectedEventIds.length === 0 && (
                 <p className="text-[11px] font-tech text-amber-400 mt-2 flex items-center gap-1.5 bg-amber-950/20 border border-amber-500/20 p-2 rounded-lg">
                   <ShieldAlert className="w-3.5 h-3.5 shrink-0" />
-                  <span>Select at least 1 game above to enter your credentials and register.</span>
+                  <span>Select at least 1 tournament event above to enter your credentials and register.</span>
                 </p>
               )}
             </div>

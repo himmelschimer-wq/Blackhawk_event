@@ -554,6 +554,31 @@ export const adminApi = {
     return { success: true };
   },
 
+  async cleanDatabase(options?: { cleanEvents?: boolean; cleanRegistrations?: boolean; cleanResults?: boolean; cleanLeaderboard?: boolean }) {
+    try {
+      const res = await fetch('/api/admin/clean-database', {
+        method: 'POST',
+        headers: this.getAuthHeaders(),
+        body: JSON.stringify(options || {})
+      });
+      if (res.ok) return await res.json();
+    } catch {}
+
+    if (isSupabaseConfigured) {
+      if (options?.cleanEvents !== false) await supabase.from('events').delete().neq('id', 'dummy_preserved_id');
+      if (options?.cleanRegistrations !== false) await supabase.from('registrations').delete().neq('id', 'dummy_preserved_id');
+      if (options?.cleanResults !== false) await supabase.from('match_results').delete().neq('id', 'dummy_preserved_id');
+      if (options?.cleanLeaderboard !== false) await supabase.from('leaderboard').delete().neq('id', 'dummy_preserved_id');
+    }
+
+    if (options?.cleanEvents !== false) localStorage.removeItem('blackhawk_fallback_events');
+    if (options?.cleanRegistrations !== false) localStorage.removeItem('blackhawk_fallback_registrations');
+    if (options?.cleanResults !== false) localStorage.removeItem('blackhawk_fallback_results');
+    if (options?.cleanLeaderboard !== false) localStorage.removeItem('blackhawk_fallback_leaderboard');
+
+    return { success: true };
+  },
+
   // ─── PLAYERS ─────────────────────────────────────────────────────────────
   async getPlayers(params?: { search?: string; game?: string; status?: string }) {
     const q = new URLSearchParams();
