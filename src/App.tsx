@@ -79,12 +79,26 @@ export function App() {
       checkCurrentRouteAndAuth();
     };
 
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Secret Admin Hotkeys: Ctrl + Shift + A or Alt + A or Ctrl + Alt + A
+      if (
+        (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'a') ||
+        (e.altKey && e.key.toLowerCase() === 'a') ||
+        (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'a')
+      ) {
+        e.preventDefault();
+        handleOpenAdmin();
+      }
+    };
+
     window.addEventListener('hashchange', handleRouteChange);
     window.addEventListener('popstate', handleRouteChange);
+    window.addEventListener('keydown', handleKeyDown);
 
     return () => {
       window.removeEventListener('hashchange', handleRouteChange);
       window.removeEventListener('popstate', handleRouteChange);
+      window.removeEventListener('keydown', handleKeyDown);
     };
   }, []);
 
@@ -165,7 +179,6 @@ export function App() {
         onNavigate={scrollToSection}
         onOpenRules={() => setIsRulesModalOpen(true)}
         onOpenAbout={() => setIsAboutModalOpen(true)}
-        onOpenAdmin={handleOpenAdmin}
       />
 
       <main>
@@ -210,7 +223,6 @@ export function App() {
         onNavigate={scrollToSection}
         onOpenRules={() => setIsRulesModalOpen(true)}
         onOpenAbout={() => setIsAboutModalOpen(true)}
-        onOpenAdmin={handleOpenAdmin}
       />
 
       {/* Floating Mobile Bottom Navigation Dock */}

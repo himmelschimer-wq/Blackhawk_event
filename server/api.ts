@@ -905,21 +905,20 @@ apiRouter.get('/registrations', requireAdminAuth, async (req: Request, res: Resp
 
 apiRouter.post('/registrations', async (req: Request, res: Response) => {
   try {
-    const { fullName, gamerTag, discordUsername, email, phone, games } = req.body;
+    const { fullName, gamerTag, username, discordUsername, discordId, email, phone, games } = req.body;
 
-    if (!fullName || !gamerTag || !games || !Array.isArray(games) || games.length === 0) {
-      return res.status(400).json({ error: 'Full name, gamer tag, and at least one game are required.' });
-    }
-
-    const sanitize = (s: string, maxLen = 100) => String(s).trim().slice(0, maxLen);
-    const cleanName = sanitize(fullName, 80);
-    const cleanTag = sanitize(gamerTag, 40);
-    const cleanDiscord = sanitize(discordUsername || 'N/A', 60);
+    const sanitize = (s: string, maxLen = 100) => String(s || '').trim().slice(0, maxLen);
+    const cleanTag = sanitize(gamerTag || username, 40);
+    const cleanName = sanitize(fullName || cleanTag, 80);
+    const cleanDiscord = sanitize(discordUsername || discordId || 'N/A', 60);
     const cleanEmail = sanitize(email || '', 120);
     const cleanPhone = sanitize(phone || '', 20);
 
-    if (cleanName.length < 2) return res.status(400).json({ error: 'Full name must be at least 2 characters.' });
-    if (cleanTag.length < 2) return res.status(400).json({ error: 'Gamer tag must be at least 2 characters.' });
+    if (!cleanTag || !games || !Array.isArray(games) || games.length === 0) {
+      return res.status(400).json({ error: 'Username / Gamer tag and at least one game are required.' });
+    }
+
+    if (cleanTag.length < 2) return res.status(400).json({ error: 'Username / Gamer tag must be at least 2 characters.' });
 
     // Check duplicate registrations in Firebase
     const existingRegistrations = await supabaseDb.list<any>('registrations');

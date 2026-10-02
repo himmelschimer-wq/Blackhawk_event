@@ -657,55 +657,40 @@ export const RegistrationSection: React.FC<RegistrationProps> = ({
               </div>
 
               {/* COMMON PLAYER INFORMATION (SHARED ACROSS ALL SELECTED GAMES) */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 
-                {/* Full Name */}
+                {/* Username / Gamer Tag */}
                 <div>
                   <label className="block text-[11px] font-tech text-zinc-300 uppercase tracking-wider font-semibold mb-1">
-                    Full Name <span className="text-[#ff2a2a]">*</span>
+                    Username / Gamer Tag <span className="text-[#ff2a2a]">*</span>
                   </label>
                   <div className="relative">
                     <User className="w-3.5 h-3.5 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
                     <input
                       required
                       type="text"
-                      placeholder="e.g. Alex Morgan"
-                      value={fullName}
-                      onChange={e => setFullName(e.target.value)}
-                      className="w-full pl-9 pr-3 py-2 bg-black/60 border border-white/10 rounded-lg font-tech text-base sm:text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-red-500 transition-colors"
-                    />
-                  </div>
-                </div>
-
-                {/* Primary Gamer Tag */}
-                <div>
-                  <label className="block text-[11px] font-tech text-zinc-300 uppercase tracking-wider font-semibold mb-1">
-                    Primary Gamer Tag <span className="text-[#ff2a2a]">*</span>
-                  </label>
-                  <div className="relative">
-                    <AtSign className="w-3.5 h-3.5 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input
-                      required
-                      type="text"
                       placeholder="e.g. ShadowHawk"
                       value={gamerTag}
-                      onChange={e => setGamerTag(e.target.value)}
+                      onChange={e => {
+                        setGamerTag(e.target.value);
+                        setFullName(e.target.value);
+                      }}
                       className="w-full pl-9 pr-3 py-2 bg-black/60 border border-white/10 rounded-lg font-tech text-base sm:text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-red-500 transition-colors"
                     />
                   </div>
                 </div>
 
-                {/* Discord Username */}
+                {/* Discord ID */}
                 <div>
                   <label className="block text-[11px] font-tech text-zinc-300 uppercase tracking-wider font-semibold mb-1">
-                    Discord Username <span className="text-[#ff2a2a]">*</span>
+                    Discord ID / Tag <span className="text-[#ff2a2a]">*</span>
                   </label>
                   <div className="relative">
                     <AtSign className="w-3.5 h-3.5 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
                     <input
                       required
                       type="text"
-                      placeholder="e.g. shadowhawk#0001"
+                      placeholder="e.g. shadowhawk or shadowhawk#0001"
                       value={discordUsername}
                       onChange={e => setDiscordUsername(e.target.value)}
                       className="w-full pl-9 pr-3 py-2 bg-black/60 border border-white/10 rounded-lg font-tech text-base sm:text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-red-500 transition-colors"
