@@ -71,10 +71,11 @@ export const IntroSplash: React.FC<IntroSplashProps> = ({
           COMMUNITY TOURNAMENTS &amp; GAMING
         </p>
 
-        {/* 2. Primary Title: Mask Wipe Left-to-Right + Single Subtle Red Light Sweep */}
+        {/* 2. Primary Title: Clean Mask Wipe Left-to-Right */}
         <div className="intro-title-wrapper overflow-hidden my-1 sm:my-2">
           <h1 className="intro-title font-cinzel font-black text-4xl sm:text-6xl md:text-7xl lg:text-8xl tracking-[0.16em] sm:tracking-[0.22em] uppercase text-white leading-none">
-            <span className="intro-sweep-text">BLACKHAWK</span>
+            <span>BLACK</span>
+            <span className="text-[#D71920] ml-1">HAWK</span>
           </h1>
         </div>
 

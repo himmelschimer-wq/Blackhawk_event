@@ -16,8 +16,8 @@ export const MobileBottomBar: React.FC<MobileBottomBarProps> = ({
   isRevealed = true,
 }) => {
   return (
-    <div className={`sm:hidden fixed bottom-3 inset-x-3 z-40 pointer-events-auto transition-opacity duration-300 ${
-      isRevealed ? 'animate-site-bottomnav' : 'opacity-0 pointer-events-none'
+    <div className={`sm:hidden fixed bottom-3 inset-x-3 z-40 pointer-events-auto transition-all duration-500 ease-out ${
+      isRevealed ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3 pointer-events-none'
     }`}>
       <nav
         aria-label="Mobile Quick Bar"

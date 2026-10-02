@@ -68,8 +68,8 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   return (
     <header
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        isRevealed ? 'animate-site-navbar' : 'opacity-0 pointer-events-none'
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ease-out ${
+        isRevealed ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-3 pointer-events-none'
       } ${
         scrolled
           ? 'bg-[#080808]/92 backdrop-blur-md border-b border-white/5 py-3 shadow-[0_4px_25px_rgba(0,0,0,0.8)]'
