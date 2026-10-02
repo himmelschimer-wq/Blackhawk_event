@@ -114,6 +114,7 @@ app.get('/api', (_req: Request, res: Response) => {
 
 // ─── MOUNT API ROUTES ────────────────────────────────────────────────────────
 app.use('/api', apiRouter);
+app.use(apiRouter);
 
 // ─── OPTIONAL FULLSTACK STATIC SERVING (IF DIST EXISTS) ──────────────────────
 // Detect if built client frontend exists (for single-container deployments)

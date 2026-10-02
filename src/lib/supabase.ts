@@ -2,18 +2,18 @@ import { createClient, type SupabaseClient, type RealtimeChannel } from '@supaba
 
 export const SUPABASE_URL = (
   import.meta.env.VITE_SUPABASE_URL ||
-  'https://xyzcompany.supabase.co'
+  'https://inwyqpxnnirfaqltzorz.supabase.co'
 ).trim();
 
 export const SUPABASE_ANON_KEY = (
   import.meta.env.VITE_SUPABASE_ANON_KEY ||
-  'public-anon-key'
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlud3lxcHhubmlyZmFxbHR6b3J6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA4NzQxOTYsImV4cCI6MjEwNjQ1MDE5Nn0.Ls1fM8YlTsCJFL83vp790pw9_T7rZ686uJEs7ljxnj8'
 ).trim();
 
 export const isSupabaseConfigured = Boolean(
-  import.meta.env.VITE_SUPABASE_URL && 
-  import.meta.env.VITE_SUPABASE_ANON_KEY &&
-  !import.meta.env.VITE_SUPABASE_URL.includes('xyzcompany')
+  SUPABASE_URL && 
+  SUPABASE_ANON_KEY &&
+  !SUPABASE_URL.includes('xyzcompany')
 );
 
 // Initialize Supabase Client
