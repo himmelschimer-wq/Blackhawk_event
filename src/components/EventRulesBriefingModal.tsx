@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, ShieldCheck, FileText, Check, ArrowRight, ShieldAlert } from 'lucide-react';
 import { sfx } from '../utils/sfx';
 import { type DBEventItem } from './UpcomingEventsAndLeaderboard';
+import { FormattedRuleText } from '../utils/ruleFormatter';
 
 interface EventRulesBriefingModalProps {
   isOpen: boolean;
@@ -43,10 +44,10 @@ export const EventRulesBriefingModal: React.FC<EventRulesBriefingModalProps> = (
 
   const specificRules = parseRules(event.rules);
   const defaultGeneralRules = [
-    "1. Room ID & Password are ONLY distributed via our official Discord server (no other way). Please ensure you are active in the tournament Discord channel before match time.",
-    "2. Fair play is strictly enforced: Zero tolerance for aimbots, scripts, teaming in solos, or unauthorized emulators.",
-    "3. Screen recording is not compulsory for players; however, Tournament Admins and Event Managers hold full authority and will make the final conclusions on all match results and disputes.",
-    "4. Prize pool distribution is awarded according to each specific event's rules and briefing, transferred directly via UPI / Bank Transfer following result verification."
+    "1. Room ID & Password are [gold]ONLY distributed via our official Discord server[/gold] (no other way). Please ensure you are active in the tournament Discord channel before match time.",
+    "2. Fair play is strictly enforced: [red]Zero tolerance[/red] for aimbots, scripts, teaming in solos, or unauthorized emulators.",
+    "3. Screen recording is not compulsory for players; however, [cyan]Tournament Admins and Event Managers[/cyan] hold full authority and will make the final conclusions on all match results and disputes.",
+    "4. Prize pool distribution is awarded according to each specific event's rules and briefing, transferred directly via [green]UPI / Bank Transfer[/green] following result verification."
   ];
   const generalRules = parseRules(event.generalRules).length > 0 ? parseRules(event.generalRules) : defaultGeneralRules;
 
@@ -130,11 +131,11 @@ export const EventRulesBriefingModal: React.FC<EventRulesBriefingModalProps> = (
 
           {/* Description if present */}
           {event.description && (
-            <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5 text-xs text-zinc-300 leading-relaxed font-sans">
-              <span className="text-[10px] font-tech uppercase text-zinc-400 font-bold block mb-1">
+            <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/10 text-xs text-zinc-300 leading-relaxed font-sans">
+              <span className="text-[10px] font-tech uppercase text-[#D71920] font-bold block mb-1.5 tracking-wider">
                 TOURNAMENT OVERVIEW:
               </span>
-              {event.description}
+              <FormattedRuleText text={event.description} asParagraphs={true} />
             </div>
           )}
 
@@ -152,7 +153,7 @@ export const EventRulesBriefingModal: React.FC<EventRulesBriefingModalProps> = (
                 specificRules.map((r, idx) => (
                   <div key={idx} className="flex items-start gap-2.5 text-xs sm:text-sm leading-relaxed text-zinc-300">
                     <span className="w-1.5 h-1.5 rounded-full bg-[#D71920] mt-2 shrink-0" />
-                    <span>{r}</span>
+                    <FormattedRuleText text={r} />
                   </div>
                 ))
               ) : (
@@ -176,7 +177,7 @@ export const EventRulesBriefingModal: React.FC<EventRulesBriefingModalProps> = (
               {generalRules.map((gr, idx) => (
                 <div key={idx} className="flex items-start gap-2.5 text-xs sm:text-sm leading-relaxed text-zinc-300">
                   <span className="w-1.5 h-1.5 rounded-full bg-red-500/80 mt-2 shrink-0" />
-                  <span>{gr}</span>
+                  <FormattedRuleText text={gr} />
                 </div>
               ))}
             </div>

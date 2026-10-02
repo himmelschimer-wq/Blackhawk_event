@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { adminApi } from '../lib/adminApi';
 import { 
   Plus, 
@@ -12,99 +12,97 @@ import {
   Sparkles,
   RotateCcw,
   CheckCircle2,
-  Trophy
+  Trophy,
+  Palette,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { sfx } from '../utils/sfx';
+import { FormattedRuleText, COLOR_OPTIONS } from '../utils/ruleFormatter';
 
 // Game Rules Preset Templates for fast creation
-const GAME_RULE_PRESETS: Record<string, { rules: string; generalRules: string; format: string }> = {
+const GAME_RULE_PRESETS: Record<string, { rules: string; generalRules: string }> = {
   bgmi: {
-    format: 'SQUAD',
     rules: [
-      '1. Custom Room ID & Password shared ONLY on Discord (no other way) 15 minutes before match start.',
-      '2. Mobile devices only (Smartphones). Emulators, iPad view mods, and physical trigger accessories are strictly forbidden.',
-      '3. Official Maps: Erangel (Match 1) & Miramar (Match 2). Standard competitive circle shrink times.',
-      '4. Scoring: 1st Place: 10 pts, 2nd: 6 pts, 3rd: 5 pts, 4th: 4 pts, 5th: 3 pts, 6th: 2 pts, 7th-8th: 1 pt. Kill Point: 1 pt per kill.',
+      '1. Custom Room ID & Password shared [gold]ONLY on Discord[/gold] (no other way) 15 minutes before match start.',
+      '2. [red]Mobile devices only[/red] (Smartphones). Emulators, iPad view mods, and physical trigger accessories are strictly forbidden.',
+      '3. Official Maps: [cyan]Erangel (Match 1)[/cyan] & [cyan]Miramar (Match 2)[/cyan]. Standard competitive circle shrink times.',
+      '4. Scoring: [gold]1st: 10 pts[/gold], 2nd: 6 pts, 3rd: 5 pts, 4th: 4 pts, 5th: 3 pts, 6th: 2 pts, 7th-8th: 1 pt. Kill Point: [green]1 pt per kill[/green].',
       '5. Team Captain must submit clear end-screen scoreboard screenshot in #match-results within 15 mins (recordings not mandatory).'
     ].join('\n'),
     generalRules: [
-      '1. Discord check-in mandatory for all team members 30 minutes prior.',
-      '2. Strict zero-tolerance policy against teaming, stream sniping, or verbal abuse.',
-      '3. Screen recording is not mandatory for players; Tournament Admins & Event Managers take final conclusions on all match results and disputes.',
-      '4. Prize pool distribution is awarded according to specific event rules and dispatched via UPI / Bank Transfer.'
+      '1. Discord check-in mandatory for all team members [gold]30 minutes prior[/gold].',
+      '2. [red]Strict zero-tolerance policy[/red] against teaming, stream sniping, or verbal abuse.',
+      '3. Screen recording is not mandatory for players; [cyan]Tournament Admins & Event Managers[/cyan] take final conclusions on all match results and disputes.',
+      '4. Prize pool distribution is awarded according to specific event rules and dispatched via [green]UPI / Bank Transfer[/green].'
     ].join('\n')
   },
   'free-fire': {
-    format: 'SOLO / SQUAD',
     rules: [
-      '1. Custom Room ID & Password shared ONLY on official Discord (no other way) 15 minutes prior to match start.',
+      '1. Custom Room ID & Password shared [gold]ONLY on official Discord[/gold] (no other way) 15 minutes prior to match start.',
       '2. Classic Battle Royale / Clash Squad custom room mode.',
-      '3. Character Skills: ACTIVE. Gun Attributes: OFF (Competitive Standard). Limited Ammo: YES.',
-      '4. Mobile devices only. Emulators or third-party sensitivity scripts result in immediate disqualification.',
-      '5. Point System: 1st Place (Booyah): 12 pts, 2nd: 9 pts, 3rd: 8 pts, 4th: 7 pts. Kill Point: 1 pt per kill.',
+      '3. Character Skills: [green]ACTIVE[/green]. Gun Attributes: [red]OFF[/red] (Competitive Standard). Limited Ammo: [green]YES[/green].',
+      '4. [red]Mobile devices only[/red]. Emulators or third-party sensitivity scripts result in immediate disqualification.',
+      '5. Point System: [gold]1st Place (Booyah): 12 pts[/gold], 2nd: 9 pts, 3rd: 8 pts, 4th: 7 pts. Kill Point: [green]1 pt per kill[/green].',
       '6. Submit screenshot of final match scoreboard for verification (continuous recording not mandatory).'
     ].join('\n'),
     generalRules: [
       '1. Accurate In-Game UID and IGN must match your registration form exactly.',
-      '2. Tournament Admins and Event Managers hold full authority to make final decisions on all disputes.',
-      '3. Prize pool distribution is awarded according to event rules via verified UPI.'
+      '2. [cyan]Tournament Admins and Event Managers[/cyan] hold full authority to make final decisions on all disputes.',
+      '3. Prize pool distribution is awarded according to event rules via [green]verified UPI[/green].'
     ].join('\n')
   },
   valorant: {
-    format: '5v5',
     rules: [
-      '1. Custom Lobby details shared ONLY on official Discord (no other way).',
+      '1. Custom Lobby details shared [gold]ONLY on official Discord[/gold] (no other way).',
       '2. Mode: Standard 5v5 Custom Game (Tournament Mode: ON, Overtime: Win by Two).',
       '3. Map Pool: Ascent, Bind, Haven, Split, Lotus, Sunset, Abyss. Map veto done in Discord prior to match.',
-      '4. Tactical Pauses: 1 tactical timeout allowed per half (60 seconds each). Riot Vanguard must remain active.',
+      '4. Tactical Pauses: 1 tactical timeout allowed per half (60 seconds each). [red]Riot Vanguard must remain active[/red].',
       '5. Team captains must upload post-match summary screenshots (VOD recording is optional for players).'
     ].join('\n'),
     generalRules: [
-      '1. All players must be in the designated BlackHawk Discord voice channels during match play.',
-      '2. Tournament Admins and Event Managers take final conclusions on match outcomes and disputes.',
-      '3. Prize pool distribution as specified in event rules, disbursed within 48 hours post-verification.'
+      '1. All players must be in the designated [gold]BlackHawk Discord voice channels[/gold] during match play.',
+      '2. [cyan]Tournament Admins and Event Managers[/cyan] take final conclusions on match outcomes and disputes.',
+      '3. Prize pool distribution as specified in event rules, disbursed within [green]48 hours post-verification[/green].'
     ].join('\n')
   },
   minecraft: {
-    format: 'SOLO / TEAM',
     rules: [
-      '1. Server IP & connection details shared ONLY on official Discord (no other way).',
+      '1. Server IP & connection details shared [gold]ONLY on official Discord[/gold] (no other way).',
       '2. Game Mode: Bedwars / Speedrun Challenge / Survival Games as specified in bracket.',
-      '3. Prohibited: X-ray texture packs, hacked clients (Meteor, Aristois, etc.), auto-clickers (>15 CPS).',
+      '3. Prohibited: [red]X-ray texture packs, hacked clients, auto-clickers (>15 CPS)[/red].',
       '4. Final placement determined by in-game leaderboards and server logging (screen recording not mandatory for players).'
     ].join('\n'),
     generalRules: [
       '1. Player IGN must match the registered Minecraft handle.',
-      '2. Tournament Admins & Event Managers make final conclusions on all match decisions.',
-      '3. Prize pool distributed according to specific event rules via UPI.'
+      '2. [cyan]Tournament Admins & Event Managers[/cyan] make final conclusions on all match decisions.',
+      '3. Prize pool distributed according to specific event rules via [green]UPI[/green].'
     ].join('\n')
   },
   chess: {
-    format: 'SOLO',
     rules: [
-      '1. Platform: Chess.com / Lichess.org official tournament arena link shared ONLY on Discord.',
-      '2. Time Control: 3+2 Blitz or 5+0 Rapid as scheduled.',
+      '1. Platform: Chess.com / Lichess.org official tournament arena link shared [gold]ONLY on Discord[/gold].',
+      '2. Time Control: [gold]3+2 Blitz or 5+0 Rapid[/gold] as scheduled.',
       '3. Anti-Cheating: Automated engine analysis performed on all games.',
       '4. Disconnections: Player is responsible for their own internet stability.'
     ].join('\n'),
     generalRules: [
-      '1. Account must be at least 30 days old and have verified rating history.',
-      '2. Admins and Event Managers make final conclusions regarding disputes and fair play.',
+      '1. Account must be at least [gold]30 days old[/gold] and have verified rating history.',
+      '2. [cyan]Admins and Event Managers[/cyan] make final conclusions regarding disputes and fair play.',
       '3. Prize pool distributed according to event rules directly following review.'
     ].join('\n')
   },
   scribble: {
-    format: 'SOLO',
     rules: [
-      '1. Private Skribbl.io custom room lobby link sent ONLY on Discord 5 minutes prior to match.',
-      '2. Drawing Time: 80 Seconds per round. Custom words list enabled.',
-      '3. Strictly forbidden: Writing words or spelling out answers directly on canvas.',
+      '1. Private Skribbl.io custom room lobby link sent [gold]ONLY on Discord[/gold] 5 minutes prior to match.',
+      '2. Drawing Time: [gold]80 Seconds[/gold] per round. Custom words list enabled.',
+      '3. Strictly forbidden: [red]Writing words or spelling out answers directly on canvas[/red].',
       '4. Highest cumulative points at the end of all rounds takes the crown.'
     ].join('\n'),
     generalRules: [
       '1. Keep drawing and chat family-friendly and respectful.',
-      '2. Admins and Event Managers hold final decision on any disputed answers.',
-      '3. Prizes distributed according to event rules immediately post-session.'
+      '2. [cyan]Admins and Event Managers[/cyan] hold final decision on any disputed answers.',
+      '3. Prizes distributed according to event rules immediately post-session via [green]UPI[/green].'
     ].join('\n')
   }
 };
@@ -140,6 +138,49 @@ export const AdminEvents: React.FC = () => {
   const [formRules, setFormRules] = useState('');
   const [formGeneralRules, setFormGeneralRules] = useState('');
   const [formBanner, setFormBanner] = useState('');
+  const [showRulesLivePreview, setShowRulesLivePreview] = useState(false);
+
+  const rulesTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const generalRulesTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const descTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const applyFormatTag = (target: 'rules' | 'generalRules' | 'desc', openTag: string, closeTag: string) => {
+    sfx.playClick();
+    let ref: HTMLTextAreaElement | null = null;
+    let currentVal = '';
+    let setVal: React.Dispatch<React.SetStateAction<string>> = () => {};
+
+    if (target === 'rules') {
+      ref = rulesTextareaRef.current;
+      currentVal = formRules;
+      setVal = setFormRules;
+    } else if (target === 'generalRules') {
+      ref = generalRulesTextareaRef.current;
+      currentVal = formGeneralRules;
+      setVal = setFormGeneralRules;
+    } else {
+      ref = descTextareaRef.current;
+      currentVal = formDesc;
+      setVal = setFormDesc;
+    }
+
+    if (!ref) {
+      setVal(prev => prev ? `${prev}\n${openTag}highlighted text${closeTag}` : `${openTag}highlighted text${closeTag}`);
+      return;
+    }
+
+    const start = ref.selectionStart;
+    const end = ref.selectionEnd;
+    const selectedText = currentVal.substring(start, end) || 'highlighted text';
+    const replacement = `${openTag}${selectedText}${closeTag}`;
+    const newVal = currentVal.substring(0, start) + replacement + currentVal.substring(end);
+    setVal(newVal);
+
+    setTimeout(() => {
+      ref.focus();
+      ref.setSelectionRange(start + openTag.length, start + openTag.length + selectedText.length);
+    }, 30);
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -181,7 +222,6 @@ export const AdminEvents: React.FC = () => {
     if (matchedPreset) {
       setFormRules(matchedPreset.rules);
       setFormGeneralRules(matchedPreset.generalRules);
-      setFormFormat(matchedPreset.format);
     } else {
       setFormRules([
         '1. Match lobby credentials will be shared in Discord 15 minutes before the start time.',
@@ -652,6 +692,11 @@ export const AdminEvents: React.FC = () => {
                     <option value="SQUAD">SQUAD (4-Man)</option>
                     <option value="5v5">5v5 Tactical</option>
                     <option value="1v1 CHALLENGE">1v1 CHALLENGE</option>
+                    <option value="SOLO / SQUAD">SOLO / SQUAD</option>
+                    <option value="SOLO / TEAM">SOLO / TEAM</option>
+                    {!['SOLO', 'DUO', 'SQUAD', '5v5', '1v1 CHALLENGE', 'SOLO / SQUAD', 'SOLO / TEAM'].includes(formFormat) && formFormat && (
+                      <option value={formFormat}>{formFormat}</option>
+                    )}
                   </select>
                 </div>
               </div>
@@ -741,68 +786,245 @@ export const AdminEvents: React.FC = () => {
               </div>
 
               <div>
-                <label className="block font-semibold text-zinc-300 mb-1">Tournament Overview & Description</label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block font-semibold text-zinc-300 text-xs">
+                    Tournament Overview &amp; Description
+                  </label>
+                  <span className="text-[10px] text-zinc-500 font-mono">Supports colors &amp; **bold**</span>
+                </div>
+
+                {/* Color Highlight Bar for Overview */}
+                <div className="flex flex-wrap items-center justify-between gap-1.5 px-3 py-1.5 rounded-t-lg bg-black/80 border-t border-x border-white/15 text-[10px]">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="text-zinc-400 font-tech font-bold uppercase tracking-wider flex items-center gap-1 mr-1">
+                      <Palette className="w-3 h-3 text-[#D71920]" />
+                      Text Color:
+                    </span>
+                    {COLOR_OPTIONS.map((c) => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => applyFormatTag('desc', `[${c.tag}]`, `[/${c.tag}]`)}
+                        className="px-2 py-0.5 rounded border border-white/10 hover:border-white/40 text-white font-medium flex items-center gap-1.5 bg-zinc-900/90 hover:bg-zinc-800 transition-all active:scale-95 cursor-pointer shadow-sm"
+                        title={`Color selected text in ${c.label}`}
+                      >
+                        <span className={`w-2 h-2 rounded-full ${c.bg} shadow-sm`} />
+                        <span className="text-[10px]">{c.name}</span>
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => applyFormatTag('desc', '**', '**')}
+                      className="px-2 py-0.5 rounded border border-white/10 hover:border-white/40 text-white font-bold bg-zinc-900/90 hover:bg-zinc-800 transition-all active:scale-95 cursor-pointer text-[10px]"
+                      title="Make selected text bold (**text**)"
+                    >
+                      Bold
+                    </button>
+                  </div>
+                </div>
+
                 <textarea
-                  rows={2}
+                  ref={descTextareaRef}
+                  rows={3}
                   value={formDesc}
                   onChange={(e) => setFormDesc(e.target.value)}
-                  placeholder="Overview of the tournament format, map rotation, and match rules..."
-                  className="w-full px-3.5 py-2.5 rounded-lg bg-black/60 border border-white/10 text-white focus:outline-none focus:border-[#D71920]"
+                  placeholder="Overview of the tournament format, map rotation, and prize breakdown (supports new lines, **bold**, and [gold]colors[/gold])..."
+                  className="w-full px-3.5 py-2.5 rounded-b-lg rounded-t-none bg-black/70 border border-white/15 text-white font-mono text-[11px] placeholder:text-zinc-600 focus:outline-none focus:border-[#D71920] leading-relaxed"
                 />
+
+                {/* Live Preview for Description */}
+                {showRulesLivePreview && formDesc && (
+                  <div className="mt-2 p-3 rounded-lg bg-black/90 border border-amber-500/30 space-y-1">
+                    <div className="text-[10px] font-tech text-amber-400 font-bold uppercase tracking-wider">
+                      Live Overview Preview:
+                    </div>
+                    <div className="text-xs text-zinc-300 font-mono">
+                      <FormattedRuleText text={formDesc} asParagraphs={true} />
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Event-Specific Rules Builder Section */}
-              <div className="pt-4 border-t border-white/10 space-y-3.5 bg-white/[0.01] p-4 rounded-xl border">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="pt-4 border-t border-white/10 space-y-4 bg-white/[0.01] p-4 rounded-xl border border-white/10">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                   <div className="flex items-center gap-2">
                     <ShieldCheck className="w-4 h-4 text-[#D71920]" />
                     <h4 className="font-cinzel text-xs font-bold text-white uppercase tracking-wider">
-                      EVENT-SPECIFIC RULES & REGULATIONS
+                      EVENT-SPECIFIC RULES &amp; REGULATIONS
                     </h4>
                   </div>
 
-                  {/* Preset Rule Helper */}
-                  <button
-                    type="button"
-                    onClick={() => applyRulesPreset(formGameId)}
-                    className="px-2.5 py-1 rounded bg-red-950/80 hover:bg-red-900 border border-red-500/40 text-[10px] font-tech font-bold text-[#ff4d4d] hover:text-white uppercase transition-colors flex items-center gap-1 cursor-pointer self-start sm:self-auto"
-                    title="Auto-fill rules from tournament template"
-                  >
-                    <Sparkles className="w-3 h-3 text-[#f5c464]" />
-                    <span>Auto-Fill {games.find(g => g.id === formGameId)?.name || 'Game'} Rules</span>
-                  </button>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {/* Live Preview Toggle */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        sfx.playClick();
+                        setShowRulesLivePreview(!showRulesLivePreview);
+                      }}
+                      className={`px-2.5 py-1 rounded text-[10px] font-tech font-bold uppercase transition-colors flex items-center gap-1.5 cursor-pointer ${
+                        showRulesLivePreview
+                          ? 'bg-amber-500/20 border border-amber-500/50 text-amber-300'
+                          : 'bg-white/5 border border-white/10 text-zinc-400 hover:text-white'
+                      }`}
+                      title="Toggle Live Formatting Preview"
+                    >
+                      {showRulesLivePreview ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                      <span>{showRulesLivePreview ? 'Hide Live Preview' : 'Live Highlight Preview'}</span>
+                    </button>
+
+                    {/* Preset Rule Helper */}
+                    <button
+                      type="button"
+                      onClick={() => applyRulesPreset(formGameId)}
+                      className="px-2.5 py-1 rounded bg-red-950/80 hover:bg-red-900 border border-red-500/40 text-[10px] font-tech font-bold text-[#ff4d4d] hover:text-white uppercase transition-colors flex items-center gap-1 cursor-pointer"
+                      title="Auto-fill rules from tournament template"
+                    >
+                      <Sparkles className="w-3 h-3 text-[#f5c464]" />
+                      <span>Auto-Fill Template</span>
+                    </button>
+                  </div>
                 </div>
 
+                {/* Match Rules & Scoring Section */}
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <label className="block font-semibold text-zinc-200">
-                      Match Rules, Device Standards & Scoring System
+                    <label className="block font-semibold text-zinc-200 text-xs">
+                      Match Rules, Device Standards &amp; Scoring System
                     </label>
                     <span className="text-[10px] text-zinc-500 font-mono">1 rule per line</span>
                   </div>
+
+                  {/* Color Highlight Bar for Match Rules */}
+                  <div className="flex flex-wrap items-center justify-between gap-1.5 px-3 py-1.5 rounded-t-lg bg-black/80 border-t border-x border-white/15 text-[10px]">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-zinc-400 font-tech font-bold uppercase tracking-wider flex items-center gap-1 mr-1">
+                        <Palette className="w-3 h-3 text-[#D71920]" />
+                        Highlight Color:
+                      </span>
+                      {COLOR_OPTIONS.map((c) => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => applyFormatTag('rules', `[${c.tag}]`, `[/${c.tag}]`)}
+                          className="px-2 py-0.5 rounded border border-white/10 hover:border-white/40 text-white font-medium flex items-center gap-1.5 bg-zinc-900/90 hover:bg-zinc-800 transition-all active:scale-95 cursor-pointer shadow-sm"
+                          title={`Wrap selected text with ${c.label} tag`}
+                        >
+                          <span className={`w-2 h-2 rounded-full ${c.bg} shadow-sm`} />
+                          <span className="text-[10px]">{c.name}</span>
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => applyFormatTag('rules', '**', '**')}
+                        className="px-2 py-0.5 rounded border border-white/10 hover:border-white/40 text-white font-bold bg-zinc-900/90 hover:bg-zinc-800 transition-all active:scale-95 cursor-pointer text-[10px]"
+                        title="Make selected text bold (**text**)"
+                      >
+                        Bold
+                      </button>
+                    </div>
+                  </div>
+
                   <textarea
+                    ref={rulesTextareaRef}
                     rows={5}
                     value={formRules}
                     onChange={(e) => setFormRules(e.target.value)}
-                    placeholder={"1. Custom room credentials will be shared 15 minutes before match.\n2. Mobile devices only; emulators and iPad mods strictly prohibited.\n3. Squad captain must submit final score screenshot."}
-                    className="w-full px-3.5 py-2.5 rounded-lg bg-black/70 border border-white/10 text-white font-mono text-[11px] placeholder:text-zinc-600 focus:outline-none focus:border-[#D71920] leading-relaxed"
+                    placeholder={"1. Custom room credentials will be shared [gold]15 minutes[/gold] before match.\n2. [red]Mobile devices only[/red]; emulators strictly prohibited.\n3. Squad captain must submit final score screenshot."}
+                    className="w-full px-3.5 py-2.5 rounded-b-lg rounded-t-none bg-black/70 border border-white/15 text-white font-mono text-[11px] placeholder:text-zinc-600 focus:outline-none focus:border-[#D71920] leading-relaxed"
                   />
+
+                  {/* Live Highlight Preview for Match Rules */}
+                  {showRulesLivePreview && (
+                    <div className="mt-2 p-3 rounded-lg bg-black/90 border border-amber-500/30 space-y-1.5">
+                      <div className="flex items-center gap-1.5 text-[10px] font-tech text-amber-400 font-bold uppercase tracking-wider">
+                        <Eye className="w-3 h-3" />
+                        <span>Live Highlight Preview (Match Rules)</span>
+                      </div>
+                      <div className="space-y-1.5 text-xs text-zinc-300 font-mono">
+                        {formRules.split('\n').filter(Boolean).map((line, idx) => (
+                          <div key={idx} className="flex items-start gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#D71920] mt-1.5 shrink-0" />
+                            <div>
+                              <FormattedRuleText text={line} />
+                            </div>
+                          </div>
+                        ))}
+                        {!formRules && <p className="text-zinc-500 italic text-[11px]">No rules entered yet.</p>}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
+                {/* General Code of Conduct Section */}
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <label className="block font-semibold text-zinc-200">
-                      General Code of Conduct & Payout Protocol
+                    <label className="block font-semibold text-zinc-200 text-xs">
+                      General Code of Conduct &amp; Payout Protocol
                     </label>
                     <span className="text-[10px] text-zinc-500 font-mono">1 rule per line</span>
                   </div>
+
+                  {/* Color Highlight Bar for General Rules */}
+                  <div className="flex flex-wrap items-center justify-between gap-1.5 px-3 py-1.5 rounded-t-lg bg-black/80 border-t border-x border-white/15 text-[10px]">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-zinc-400 font-tech font-bold uppercase tracking-wider flex items-center gap-1 mr-1">
+                        <Palette className="w-3 h-3 text-emerald-400" />
+                        Highlight Color:
+                      </span>
+                      {COLOR_OPTIONS.map((c) => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => applyFormatTag('generalRules', `[${c.tag}]`, `[/${c.tag}]`)}
+                          className="px-2 py-0.5 rounded border border-white/10 hover:border-white/40 text-white font-medium flex items-center gap-1.5 bg-zinc-900/90 hover:bg-zinc-800 transition-all active:scale-95 cursor-pointer shadow-sm"
+                          title={`Wrap selected text with ${c.label} tag`}
+                        >
+                          <span className={`w-2 h-2 rounded-full ${c.bg} shadow-sm`} />
+                          <span className="text-[10px]">{c.name}</span>
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => applyFormatTag('generalRules', '**', '**')}
+                        className="px-2 py-0.5 rounded border border-white/10 hover:border-white/40 text-white font-bold bg-zinc-900/90 hover:bg-zinc-800 transition-all active:scale-95 cursor-pointer text-[10px]"
+                        title="Make selected text bold (**text**)"
+                      >
+                        Bold
+                      </button>
+                    </div>
+                  </div>
+
                   <textarea
+                    ref={generalRulesTextareaRef}
                     rows={3}
                     value={formGeneralRules}
                     onChange={(e) => setFormGeneralRules(e.target.value)}
-                    placeholder={"1. Discord check-in mandatory 15 minutes prior to match time.\n2. Zero tolerance for cheating or toxic conduct.\n3. Cash prizes sent via UPI within 24-48 hours."}
-                    className="w-full px-3.5 py-2.5 rounded-lg bg-black/70 border border-white/10 text-white font-mono text-[11px] placeholder:text-zinc-600 focus:outline-none focus:border-[#D71920] leading-relaxed"
+                    placeholder={"1. Discord check-in mandatory [gold]15 minutes prior[/gold].\n2. [red]Zero tolerance[/red] for cheating or toxic conduct.\n3. Cash prizes sent via [green]UPI within 24-48 hours[/green]."}
+                    className="w-full px-3.5 py-2.5 rounded-b-lg rounded-t-none bg-black/70 border border-white/15 text-white font-mono text-[11px] placeholder:text-zinc-600 focus:outline-none focus:border-[#D71920] leading-relaxed"
                   />
+
+                  {/* Live Highlight Preview for General Rules */}
+                  {showRulesLivePreview && (
+                    <div className="mt-2 p-3 rounded-lg bg-black/90 border border-amber-500/30 space-y-1.5">
+                      <div className="flex items-center gap-1.5 text-[10px] font-tech text-amber-400 font-bold uppercase tracking-wider">
+                        <Eye className="w-3 h-3" />
+                        <span>Live Highlight Preview (General Rules)</span>
+                      </div>
+                      <div className="space-y-1.5 text-xs text-zinc-300 font-mono">
+                        {formGeneralRules.split('\n').filter(Boolean).map((line, idx) => (
+                          <div key={idx} className="flex items-start gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-1.5 shrink-0" />
+                            <div>
+                              <FormattedRuleText text={line} />
+                            </div>
+                          </div>
+                        ))}
+                        {!formGeneralRules && <p className="text-zinc-500 italic text-[11px]">No general rules entered yet.</p>}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -810,15 +1032,15 @@ export const AdminEvents: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 rounded-lg text-zinc-400 hover:text-white transition-colors"
+                  className="px-4 py-2 rounded-lg text-zinc-400 hover:text-white transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-lg bg-gradient-to-r from-[#D71920] to-[#b3141a] hover:from-[#e3262e] text-white font-bold tracking-wide uppercase transition-all shadow-[0_0_15px_rgba(215,25,32,0.35)]"
+                  className="px-5 py-2 rounded-lg bg-gradient-to-r from-[#D71920] to-[#b3141a] hover:from-[#e3262e] text-white font-bold tracking-wide uppercase transition-all shadow-[0_0_15px_rgba(215,25,32,0.35)] cursor-pointer"
                 >
-                  Save Tournament & Rules
+                  Save Tournament &amp; Rules
                 </button>
               </div>
             </form>
@@ -839,7 +1061,7 @@ export const AdminEvents: React.FC = () => {
                   {previewRulesEvent.title} — Rules Briefing
                 </h3>
               </div>
-              <button onClick={() => setPreviewRulesEvent(null)} className="text-zinc-400 hover:text-white">
+              <button onClick={() => setPreviewRulesEvent(null)} className="text-zinc-400 hover:text-white cursor-pointer">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -848,12 +1070,17 @@ export const AdminEvents: React.FC = () => {
               <div>
                 <h4 className="font-tech text-[11px] font-bold text-zinc-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">
                   <ShieldCheck className="w-3.5 h-3.5 text-[#D71920]" />
-                  SPECIFIC TOURNAMENT & MATCH RULES
+                  SPECIFIC TOURNAMENT &amp; MATCH RULES
                 </h4>
                 <div className="p-3.5 rounded-lg bg-black/60 border border-white/10 text-zinc-300 space-y-2 font-mono text-[11px] leading-relaxed">
                   {previewRulesEvent.rules ? (
                     previewRulesEvent.rules.split('\n').map((r: string, idx: number) => (
-                      <p key={idx}>{r}</p>
+                      <div key={idx} className="flex items-start gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#D71920] mt-1.5 shrink-0" />
+                        <div>
+                          <FormattedRuleText text={r} />
+                        </div>
+                      </div>
                     ))
                   ) : (
                     <p className="text-zinc-500 italic">Standard tournament rules apply.</p>
@@ -864,12 +1091,17 @@ export const AdminEvents: React.FC = () => {
               <div>
                 <h4 className="font-tech text-[11px] font-bold text-zinc-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                  GENERAL CODE OF CONDUCT & PAYOUT RULES
+                  GENERAL CODE OF CONDUCT &amp; PAYOUT RULES
                 </h4>
                 <div className="p-3.5 rounded-lg bg-black/60 border border-white/10 text-zinc-300 space-y-2 font-mono text-[11px] leading-relaxed">
                   {(previewRulesEvent.generalRules || previewRulesEvent.general_rules) ? (
                     (previewRulesEvent.generalRules || previewRulesEvent.general_rules).split('\n').map((r: string, idx: number) => (
-                      <p key={idx}>{r}</p>
+                      <div key={idx} className="flex items-start gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-1.5 shrink-0" />
+                        <div>
+                          <FormattedRuleText text={r} />
+                        </div>
+                      </div>
                     ))
                   ) : (
                     <p className="text-zinc-500 italic">Standard BlackHawk community conduct applies.</p>

@@ -117,8 +117,15 @@ export const RegistrationSection: React.FC<RegistrationProps> = ({
   };
 
   const isTeamFormat = (formatStr: string): boolean => {
-    const f = (formatStr || '').toUpperCase();
-    return f.includes('SQUAD') || f.includes('DUO') || f.includes('5V5') || f.includes('TEAM') || f.includes('4V4') || f.includes('2V2');
+    const f = (formatStr || '').toUpperCase().trim();
+    if (!f || f === 'SOLO' || f === '1V1' || f === '1V1 CHALLENGE' || f === 'SOLO / 1V1') {
+      return false;
+    }
+    // If it's a flexible hybrid format with Solo (e.g. SOLO / SQUAD or SOLO / TEAM), do not force team fields
+    if (f.includes('SOLO')) {
+      return false;
+    }
+    return f.includes('SQUAD') || f.includes('DUO') || f.includes('5V5') || f.includes('TEAM') || f.includes('4V4') || f.includes('2V2') || f.includes('TRIO');
   };
 
   // Collapsed sections toggle
