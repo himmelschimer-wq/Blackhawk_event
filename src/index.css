@@ -135,30 +135,112 @@
   }
 }
 
+/* ─── Refined Ruby Crimson Gradient for Static & Animated States ─── */
 .text-red-white-shine {
   background: linear-gradient(
     125deg,
-    #9e0b12 0%,
-    #d71920 25%,
-    #f32c37 40%,
-    rgba(255, 220, 225, 0.22) 48.2%,
-    rgba(255, 255, 255, 0.48) 50%,
-    rgba(255, 220, 225, 0.22) 51.8%,
-    #f32c37 60%,
-    #d71920 75%,
-    #9e0b12 100%
+    #ffffff 0%,
+    #e2e8f0 18%,
+    #ff4d4d 45%,
+    #D71920 70%,
+    #8B0000 100%
   );
-  background-size: 280% 100%;
   color: transparent;
   -webkit-background-clip: text;
   background-clip: text;
-  animation: slowWhiteShineOnRed 7.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
   display: inline-block;
   filter: drop-shadow(0 0 20px rgba(215, 25, 32, 0.35));
 }
 
-/* ─── Site Entrance Animations (Matching BlackHawk Flash Intro) ─── */
-@keyframes siteRevealNavbar {
+/* ─── Hero Cinematic Entrance Sequence (1.0s – 1.4s Total Orchestration) ─── */
+
+/* 1. BlackHawk Crest: Subtle scale-up (0.85 -> 1.0) with restrained red glow */
+@keyframes heroCrestEntrance {
+  0% {
+    opacity: 0;
+    transform: scale(0.85);
+    filter: drop-shadow(0 0 28px rgba(215, 25, 32, 0.75));
+  }
+  65% {
+    opacity: 1;
+    transform: scale(1.02);
+    filter: drop-shadow(0 0 20px rgba(215, 25, 32, 0.4)) drop-shadow(0 15px 30px rgba(0,0,0,0.85));
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+    filter: drop-shadow(0 15px 30px rgba(0,0,0,0.85)) drop-shadow(0 0 10px rgba(215, 25, 32, 0.15));
+  }
+}
+
+/* 2. "BLACKHAWK" Headline: Brief left-to-right light sweep (single-pass, then resting) */
+@keyframes headlineLightSweepOnce {
+  0% {
+    opacity: 0;
+    transform: translateY(12px);
+    background-size: 250% 100%;
+    background-position: -140% 0;
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  65% {
+    background-position: 60% 0;
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+    background-size: 100% 100%;
+    background-position: 0 0;
+  }
+}
+
+/* 3. Supporting Text: Fade and slide upward just after headline */
+@keyframes textSlideUpFade {
+  0% {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 4. "REGISTER NOW" Button: Arrives last with restrained red pulse that settles into normal state */
+@keyframes registerButtonEntrance {
+  0% {
+    opacity: 0;
+    transform: translateY(14px) scale(0.94);
+    box-shadow: 0 0 0px rgba(215, 25, 32, 0);
+  }
+  65% {
+    opacity: 1;
+    transform: translateY(0) scale(1.03);
+    box-shadow: 0 0 35px rgba(215, 25, 32, 0.7);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1.0);
+    box-shadow: 0 0 25px rgba(215, 25, 32, 0.4);
+  }
+}
+
+/* 5. "View Events" / Secondary Buttons / Stats: Short stagger */
+@keyframes secondaryEntrance {
+  0% {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 6. Navbar slide down */
+@keyframes navbarSlideDown {
   0% {
     opacity: 0;
     transform: translateY(-16px);
@@ -169,23 +251,11 @@
   }
 }
 
-@keyframes siteRevealHero {
+/* 7. Bottom mobile bar slide up */
+@keyframes bottomNavSlideUp {
   0% {
     opacity: 0;
-    transform: scale(0.975) translateY(24px);
-    filter: brightness(0.6) drop-shadow(0 0 40px rgba(215, 25, 32, 0.5));
-  }
-  100% {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-    filter: brightness(1) drop-shadow(0 0 0px transparent);
-  }
-}
-
-@keyframes siteRevealContent {
-  0% {
-    opacity: 0;
-    transform: translateY(30px);
+    transform: translateY(18px);
   }
   100% {
     opacity: 1;
@@ -193,20 +263,64 @@
   }
 }
 
-.animate-site-navbar {
-  animation: siteRevealNavbar 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+/* ─── Utility Class Bindings with Precise Choreographed Delays ─── */
+.animate-hero-crest {
+  animation: heroCrestEntrance 0.55s cubic-bezier(0.16, 1, 0.3, 1) 0.05s both;
 }
 
-.animate-site-hero {
-  animation: siteRevealHero 0.95s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both;
+.animate-hero-headline {
+  animation: headlineLightSweepOnce 0.65s cubic-bezier(0.16, 1, 0.3, 1) 0.2s both;
+}
+
+.animate-hero-text {
+  animation: textSlideUpFade 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.38s both;
+}
+
+.animate-hero-register {
+  animation: registerButtonEntrance 0.65s cubic-bezier(0.16, 1, 0.3, 1) 0.58s both;
+}
+
+.animate-hero-secondary {
+  animation: secondaryEntrance 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.7s both;
+}
+
+.animate-hero-stats {
+  animation: secondaryEntrance 0.65s cubic-bezier(0.16, 1, 0.3, 1) 0.78s both;
+}
+
+.animate-site-navbar {
+  animation: navbarSlideDown 0.65s cubic-bezier(0.16, 1, 0.3, 1) 0.65s both;
+}
+
+.animate-site-bottomnav {
+  animation: bottomNavSlideUp 0.65s cubic-bezier(0.16, 1, 0.3, 1) 0.75s both;
 }
 
 .animate-site-content {
-  animation: siteRevealContent 1s cubic-bezier(0.16, 1, 0.3, 1) 0.25s both;
+  animation: secondaryEntrance 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.85s both;
 }
 
 .animate-site-footer {
-  animation: siteRevealContent 1s cubic-bezier(0.16, 1, 0.3, 1) 0.4s both;
+  animation: secondaryEntrance 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.95s both;
+}
+
+/* ─── Reduced Motion Support ─── */
+@media (prefers-reduced-motion: reduce) {
+  .animate-hero-crest,
+  .animate-hero-headline,
+  .animate-hero-text,
+  .animate-hero-register,
+  .animate-hero-secondary,
+  .animate-hero-stats,
+  .animate-site-navbar,
+  .animate-site-bottomnav,
+  .animate-site-content,
+  .animate-site-footer {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
+  }
 }
 
 

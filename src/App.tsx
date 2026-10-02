@@ -200,12 +200,11 @@ export function App() {
 
       <main>
         {/* Asymmetric Cinematic Hero Section */}
-        <div className={siteRevealed ? 'animate-site-hero' : ''}>
-          <Hero
-            onRegisterClick={() => openRegistration()}
-            onExploreClick={() => scrollToSection('events')}
-          />
-        </div>
+        <Hero
+          isRevealed={siteRevealed}
+          onRegisterClick={() => openRegistration()}
+          onExploreClick={() => scrollToSection('events')}
+        />
 
         {/* Choose Your Game Section */}
         <div className={siteRevealed ? 'animate-site-content' : ''}>
@@ -251,11 +250,13 @@ export function App() {
       </div>
 
       {/* Floating Mobile Bottom Navigation Dock */}
-      <MobileBottomBar
-        onRegisterClick={() => scrollToSection('events')}
-        onNavigate={scrollToSection}
-        onOpenRules={() => setIsRulesModalOpen(true)}
-      />
+      <div className={siteRevealed ? 'animate-site-bottomnav' : ''}>
+        <MobileBottomBar
+          onRegisterClick={() => scrollToSection('events')}
+          onNavigate={scrollToSection}
+          onOpenRules={() => setIsRulesModalOpen(true)}
+        />
+      </div>
 
       {/* Event-Specific & BlackHawk General Rules Briefing Modal */}
       <EventRulesBriefingModal
