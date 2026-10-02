@@ -14,10 +14,12 @@
     "start": "node dist-server/index.js",
     "client": "vite",
     "build": "tsc -b && vite build",
+    "migrate:supabase": "tsx scripts/migrate-firebase-to-supabase.ts",
     "lint": "oxlint",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.117.2",
     "@types/bcryptjs": "^2.4.6",
     "bcryptjs": "^3.0.3",
     "cookie-parser": "^1.4.7",

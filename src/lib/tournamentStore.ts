@@ -1,11 +1,9 @@
 import { calculatePoints, type PointBreakdown } from './pointEngine';
 import { 
-  rtdb, 
-  firebaseConnectionManager, 
-  sanitizeForFirebase, 
-  parseFirebaseList 
-} from './firebase';
-import { ref, onValue, set, remove, update } from 'firebase/database';
+  supabase, 
+  supabaseConnectionManager, 
+  isSupabaseConfigured 
+} from './supabase';
 
 export type UserRole = 'ADMIN' | 'ORGANIZER' | 'VIEWER';
 
@@ -497,159 +495,342 @@ class TournamentStore {
     }
   }
 
-  private handleRtdbError(err: any) {
-    const msg = err?.message || 'Firebase RTDB error';
-    console.warn('[Firebase RTDB]:', msg);
-    const isPerm = msg.toLowerCase().includes('permission_denied') || msg.toLowerCase().includes('permission denied');
-    firebaseConnectionManager.setCustomStatus({
+  private handleSupabaseError(err: any) {
+    const msg = err?.message || 'Supabase error';
+    console.warn('[Supabase Realtime]:', msg);
+    const isPerm = msg.toLowerCase().includes('permission') || msg.toLowerCase().includes('policy');
+    supabaseConnectionManager.setCustomStatus({
       state: isPerm ? 'permission-denied' : 'error',
       errorMessage: msg
     });
   }
 
-  private async writeToRtdb(path: string, val: any) {
+  private async writeToDb(table: string, val: any) {
+    if (!isSupabaseConfigured) return;
     try {
-      // Write to blackhawk namespace
-      await set(ref(rtdb, `blackhawk/${path}`), sanitizeForFirebase(val));
-      firebaseConnectionManager.setCustomStatus({
+      // Map table and snake_case conversion
+      const tableName = table.replace(/^blackhawk\//, '').split('/')[0];
+      const normalizedTable = tableName === 'results' ? 'match_results' : tableName === 'auditLogs' ? 'audit_logs' : tableName;
+      
+      const payload: Record<string, any> = {};
+      for (const [k, v] of Object.entries(val)) {
+        if (k === 'gameSpecificDetails') payload['game_specific_details'] = v;
+        else if (k === 'prizeRules') payload['prize_rules'] = v;
+        else if (k === 'winnersJson') payload['winners_json'] = v;
+        else {
+          const snake = k.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+          payload[snake] = v;
+        }
+      }
+
+      await supabase.from(normalizedTable).upsert(payload, { onConflict: normalizedTable === 'system_settings' ? 'key' : 'id' });
+      supabaseConnectionManager.setCustomStatus({
         state: 'connected',
         lastSyncedAt: new Date().toISOString()
       });
     } catch (err: any) {
-      this.handleRtdbError(err);
+      this.handleSupabaseError(err);
     }
   }
 
-  private async removeFromRtdb(path: string) {
+  private async removeFromDb(table: string, id: string) {
+    if (!isSupabaseConfigured) return;
     try {
-      await remove(ref(rtdb, `blackhawk/${path}`));
-      firebaseConnectionManager.setCustomStatus({
+      const normalizedTable = table.replace(/^blackhawk\//, '').split('/')[0];
+      await supabase.from(normalizedTable).delete().eq('id', id);
+      supabaseConnectionManager.setCustomStatus({
         state: 'connected',
         lastSyncedAt: new Date().toISOString()
       });
     } catch (err: any) {
-      this.handleRtdbError(err);
+      this.handleSupabaseError(err);
     }
+  }
+
+  // Alias for backward compatibility
+  private writeToRtdb(path: string, val: any) {
+    return this.writeToDb(path, val);
+  }
+
+  // Alias for backward compatibility
+  private removeFromRtdb(path: string) {
+    const parts = path.split('/');
+    const id = parts[parts.length - 1];
+    return this.removeFromDb(parts[0], id);
   }
 
   private initFirebaseListeners() {
+    this.initSupabaseListeners();
+  }
+
+  private async initSupabaseListeners() {
     if (typeof window === 'undefined' || this.isFirebaseInitialized) return;
     this.isFirebaseInitialized = true;
 
+    if (!isSupabaseConfigured) {
+      console.log('[Supabase Store] Operating in local offline cached mode (add Supabase credentials in .env to enable cloud realtime).');
+      return;
+    }
+
     try {
-      // 1. Events listener (listen to blackhawk/events)
-      onValue(ref(rtdb, 'blackhawk/events'), (snap) => {
-        if (snap.exists() && snap.val()) {
-          const list = parseFirebaseList<EventRecord>(snap.val());
-          if (list.length > 0) {
-            this.events = list.sort((a, b) => (a.weekNumber || 0) - (b.weekNumber || 0));
-            this.saveToLocalStorageOnly();
-            this.notify();
+      // 1. Initial Data Fetch from Supabase
+      const [eventsRes, playersRes, regRes, resultsRes, drawsRes, logsRes] = await Promise.all([
+        supabase.from('events').select('*').order('created_at', { ascending: true }),
+        supabase.from('players').select('*').order('created_at', { ascending: false }),
+        supabase.from('registrations').select('*').order('registered_at', { ascending: false }),
+        supabase.from('match_results').select('*').order('recorded_at', { ascending: false }),
+        supabase.from('draws').select('*').order('drawn_at', { ascending: false }),
+        supabase.from('audit_logs').select('*').order('timestamp', { ascending: false }).limit(200),
+      ]);
+
+      if (eventsRes.data && eventsRes.data.length > 0) {
+        this.events = eventsRes.data.map(e => ({
+          id: e.id,
+          gameId: e.game_id,
+          gameName: e.game_name,
+          week: e.week || 'Week 1',
+          weekNumber: Number(e.week_number || 1),
+          prizePool: Number(e.prize_pool || 0),
+          registrationStatus: e.registration_status || 'OPEN',
+          eventStatus: e.event_status || 'UPCOMING',
+          startDate: e.start_date || e.date || '',
+          endDate: e.end_date || e.date || '',
+          description: e.description || ''
+        }));
+      }
+
+      if (playersRes.data && playersRes.data.length > 0) {
+        this.players = playersRes.data.map(p => ({
+          id: p.id,
+          fullName: p.full_name,
+          gamerTag: p.gamer_tag,
+          discordUsername: p.discord_username,
+          status: p.status || 'ACTIVE',
+          joinedAt: p.joined_at || p.created_at || ''
+        }));
+      }
+
+      if (regRes.data && regRes.data.length > 0) {
+        this.registrations = regRes.data.map(r => ({
+          id: r.id,
+          playerId: r.player_id || '',
+          playerName: r.player_name,
+          gamerTag: r.gamer_tag,
+          discordUsername: r.discord_username,
+          gameId: r.game_id,
+          gameName: r.game_name,
+          eventId: r.event_id,
+          eventTitle: r.event_title,
+          week: r.week,
+          status: r.status,
+          playType: r.play_type,
+          teamName: r.team_name,
+          teamMembers: r.team_members,
+          gameSpecificDetails: r.game_specific_details || {},
+          createdAt: r.registered_at || r.created_at
+        }));
+      }
+
+      if (resultsRes.data && resultsRes.data.length > 0) {
+        this.results = resultsRes.data.map(res => ({
+          id: res.id,
+          eventId: res.event_id || '',
+          gameName: res.game_name,
+          week: res.week || '',
+          playerId: res.player_id,
+          playerName: res.player_name,
+          gamerTag: res.gamer_tag,
+          placement: res.placement,
+          participated: res.participated,
+          challengeWinner: res.challenge_winner,
+          risingStar: res.rising_star,
+          points: res.points || {},
+          status: res.status,
+          publishedAt: res.published_at,
+          updatedAt: res.updated_at
+        }));
+      }
+
+      if (drawsRes.data && drawsRes.data.length > 0) {
+        this.draws = drawsRes.data.map(d => ({
+          id: d.id,
+          eventId: d.event_id || '',
+          gameName: d.game_name,
+          week: d.week || '',
+          winnerPlayerId: d.winner_player_id,
+          winnerName: d.winner_name,
+          winnerTag: d.winner_tag,
+          rewardAmount: Number(d.reward_amount || 25),
+          eligibleCount: Number(d.eligible_count || 0),
+          conductedBy: d.conducted_by || 'Admin',
+          drawnAt: d.drawn_at
+        }));
+      }
+
+      if (logsRes.data && logsRes.data.length > 0) {
+        this.auditLogs = logsRes.data.map(l => ({
+          id: l.id,
+          adminUser: l.admin_user,
+          role: l.role,
+          action: l.action,
+          targetEntity: l.target_entity,
+          targetId: l.target_id,
+          oldValue: l.old_value,
+          newValue: l.new_value,
+          timestamp: l.timestamp
+        }));
+      }
+
+      this.saveToLocalStorageOnly();
+      this.notify();
+
+      // 2. Realtime PostgreSQL Channel Subscriptions
+      supabase
+        .channel('blackhawk-public-realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, () => {
+          this.refreshFromSupabase('events');
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'players' }, () => {
+          this.refreshFromSupabase('players');
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'registrations' }, () => {
+          this.refreshFromSupabase('registrations');
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'match_results' }, () => {
+          this.refreshFromSupabase('match_results');
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'draws' }, () => {
+          this.refreshFromSupabase('draws');
+        })
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            supabaseConnectionManager.setCustomStatus({
+              state: 'connected',
+              lastSyncedAt: new Date().toISOString()
+            });
           }
-        }
-      }, (err) => this.handleRtdbError(err));
-
-      // 2. Players listener (listen to blackhawk/players)
-      onValue(ref(rtdb, 'blackhawk/players'), (snap) => {
-        if (snap.exists() && snap.val()) {
-          const list = parseFirebaseList<PlayerRecord>(snap.val());
-          if (list.length > 0) {
-            this.players = list;
-            this.saveToLocalStorageOnly();
-            this.notify();
-          }
-        }
-      }, (err) => this.handleRtdbError(err));
-
-      // 3. Registrations listener (listen to blackhawk/registrations)
-      onValue(ref(rtdb, 'blackhawk/registrations'), (snap) => {
-        if (snap.exists() && snap.val()) {
-          const list = parseFirebaseList<RegistrationRecord>(snap.val());
-          this.registrations = list.sort(
-            (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
-          );
-          this.saveToLocalStorageOnly();
-          this.notify();
-        }
-      }, (err) => this.handleRtdbError(err));
-
-      // 4. Results listener (listen to blackhawk/results or match_scores)
-      onValue(ref(rtdb, 'blackhawk/results'), (snap) => {
-        if (snap.exists() && snap.val()) {
-          const list = parseFirebaseList<MatchResultRecord>(snap.val());
-          this.results = list;
-          this.saveToLocalStorageOnly();
-          this.notify();
-        }
-      }, (err) => this.handleRtdbError(err));
-
-      // 5. Draws listener (listen to blackhawk/draws)
-      onValue(ref(rtdb, 'blackhawk/draws'), (snap) => {
-        if (snap.exists() && snap.val()) {
-          const list = parseFirebaseList<DrawRecord>(snap.val());
-          this.draws = list.sort(
-            (a, b) => new Date(b.drawnAt || 0).getTime() - new Date(a.drawnAt || 0).getTime()
-          );
-          this.saveToLocalStorageOnly();
-          this.notify();
-        }
-      }, (err) => this.handleRtdbError(err));
-
-      // 6. Audit logs listener (listen to blackhawk/auditLogs)
-      onValue(ref(rtdb, 'blackhawk/auditLogs'), (snap) => {
-        if (snap.exists() && snap.val()) {
-          const list = parseFirebaseList<AuditLogRecord>(snap.val());
-          this.auditLogs = list
-            .sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime())
-            .slice(0, 200);
-          this.saveToLocalStorageOnly();
-          this.notify();
-        }
-      }, (err) => this.handleRtdbError(err));
-
-      // 7. Rewards config listener (listen to blackhawk/rewardsConfig)
-      onValue(ref(rtdb, 'blackhawk/rewardsConfig'), (snap) => {
-        if (snap.exists() && snap.val()) {
-          this.rewardsConfig = { ...INITIAL_REWARDS, ...snap.val() };
-          this.saveToLocalStorageOnly();
-          this.notify();
-        }
-      }, (err) => this.handleRtdbError(err));
+        });
 
     } catch (err: any) {
-      this.handleRtdbError(err);
+      this.handleSupabaseError(err);
     }
   }
 
-  // Seed or Force Push all current tournament state to Firebase RTDB under blackhawk/
-  async syncAllToFirebase(): Promise<{ success: boolean; error?: string }> {
+  private async refreshFromSupabase(table: string) {
     try {
-      const mapList = <T extends { id: string }>(arr: T[]) => {
-        const m: Record<string, any> = {};
-        for (const item of arr) {
-          if (item && item.id) m[item.id] = sanitizeForFirebase(item);
+      if (table === 'events') {
+        const { data } = await supabase.from('events').select('*');
+        if (data) {
+          this.events = data.map(e => ({
+            id: e.id,
+            gameId: e.game_id,
+            gameName: e.game_name,
+            week: e.week || 'Week 1',
+            weekNumber: Number(e.week_number || 1),
+            prizePool: Number(e.prize_pool || 0),
+            registrationStatus: e.registration_status || 'OPEN',
+            eventStatus: e.event_status || 'UPCOMING',
+            startDate: e.start_date || e.date || '',
+            endDate: e.end_date || e.date || '',
+            description: e.description || ''
+          }));
+          this.saveToLocalStorageOnly();
+          this.notify();
         }
-        return m;
-      };
+      } else if (table === 'registrations') {
+        const { data } = await supabase.from('registrations').select('*').order('registered_at', { ascending: false });
+        if (data) {
+          this.registrations = data.map(r => ({
+            id: r.id,
+            playerId: r.player_id || '',
+            playerName: r.player_name,
+            gamerTag: r.gamer_tag,
+            discordUsername: r.discord_username,
+            gameId: r.game_id,
+            gameName: r.game_name,
+            eventId: r.event_id,
+            eventTitle: r.event_title,
+            week: r.week,
+            status: r.status,
+            playType: r.play_type,
+            teamName: r.team_name,
+            teamMembers: r.team_members,
+            gameSpecificDetails: r.game_specific_details || {},
+            createdAt: r.registered_at || r.created_at
+          }));
+          this.saveToLocalStorageOnly();
+          this.notify();
+        }
+      }
+    } catch {}
+  }
 
-      await set(ref(rtdb, 'blackhawk/events'), mapList(this.events));
-      await set(ref(rtdb, 'blackhawk/players'), mapList(this.players));
-      await set(ref(rtdb, 'blackhawk/registrations'), mapList(this.registrations));
-      await set(ref(rtdb, 'blackhawk/results'), mapList(this.results));
-      await set(ref(rtdb, 'blackhawk/draws'), mapList(this.draws));
-      await set(ref(rtdb, 'blackhawk/auditLogs'), mapList(this.auditLogs));
-      await set(ref(rtdb, 'blackhawk/rewardsConfig'), sanitizeForFirebase(this.rewardsConfig));
+  // Push all local tournament state to Supabase PostgreSQL
+  async syncAllToSupabase(): Promise<{ success: boolean; error?: string }> {
+    if (!isSupabaseConfigured) {
+      return { success: false, error: 'Supabase credentials missing in .env' };
+    }
+    try {
+      // Upsert events
+      for (const ev of this.events) {
+        await supabase.from('events').upsert({
+          id: ev.id,
+          game_id: ev.gameId,
+          game_name: ev.gameName,
+          title: ev.gameName + ' ' + ev.week,
+          description: ev.description,
+          date: ev.startDate || 'TBD',
+          time: '7:00 PM',
+          format: 'SOLO',
+          prize_pool: ev.prizePool,
+          registration_status: ev.registrationStatus,
+          event_status: ev.eventStatus
+        });
+      }
 
-      firebaseConnectionManager.setCustomStatus({
+      // Upsert players
+      for (const p of this.players) {
+        await supabase.from('players').upsert({
+          id: p.id,
+          full_name: p.fullName,
+          gamer_tag: p.gamerTag,
+          discord_username: p.discordUsername,
+          status: p.status
+        });
+      }
+
+      // Upsert registrations
+      for (const r of this.registrations) {
+        await supabase.from('registrations').upsert({
+          id: r.id,
+          player_id: r.playerId,
+          player_name: r.playerName,
+          gamer_tag: r.gamerTag,
+          discord_username: r.discordUsername,
+          game_id: r.gameId,
+          game_name: r.gameName,
+          week: r.week,
+          play_type: r.playType,
+          status: r.status,
+          game_specific_details: r.gameSpecificDetails
+        });
+      }
+
+      supabaseConnectionManager.setCustomStatus({
         state: 'connected',
         lastSyncedAt: new Date().toISOString()
       });
       return { success: true };
     } catch (err: any) {
       const msg = err?.message || 'Sync failed';
-      this.handleRtdbError(err);
+      this.handleSupabaseError(err);
       return { success: false, error: msg };
     }
+  }
+
+  // Alias for backward compatibility
+  async syncAllToFirebase(): Promise<{ success: boolean; error?: string }> {
+    return this.syncAllToSupabase();
   }
 
   subscribe(listener: () => void) {
@@ -1014,7 +1195,7 @@ class TournamentStore {
           publishedAt: now,
           updatedAt: now
         };
-        updatedMap[pub.id] = sanitizeForFirebase(pub);
+        updatedMap[pub.id] = pub;
         return pub;
       }
       return r;
@@ -1024,7 +1205,9 @@ class TournamentStore {
     this.saveToStorage();
 
     if (Object.keys(updatedMap).length > 0) {
-      update(ref(rtdb, 'results'), updatedMap).catch(err => this.handleRtdbError(err));
+      for (const [resId, item] of Object.entries(updatedMap)) {
+        this.writeToDb(`match_results/${resId}`, item);
+      }
     }
   }
 

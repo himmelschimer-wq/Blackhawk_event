@@ -21,7 +21,7 @@ npm start
 Default server URL: `http://localhost:3001`
 
 ---
-
+![alt text](image.png)
 ## 🛠️ Environment Variables
 
 | Variable | Description | Default |

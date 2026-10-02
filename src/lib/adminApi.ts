@@ -1,8 +1,7 @@
-// BlackHawk Esports Real Database API Client & Firebase Hybrid Client
-import { FIREBASE_RTDB_URL } from './firebase';
+// BlackHawk Esports Real Database API Client & Supabase Client
+import { supabase, isSupabaseConfigured } from './supabase';
 
 const TOKEN_KEY = 'blackhawk_admin_token';
-const RTDB_BASE = FIREBASE_RTDB_URL.replace(/\/$/, '');
 
 export interface AdminUser {
   id: string;
@@ -11,8 +10,8 @@ export interface AdminUser {
   role: string;
 }
 
-// Helper to fetch from backend or fallback to Firebase RTDB REST
-async function fetchWithFallback<T>(apiPath: string, firebasePath: string, options?: RequestInit): Promise<T> {
+// Helper to fetch from backend or fallback to direct Supabase query
+async function fetchWithFallback<T>(apiPath: string, supabaseTable: string, options?: RequestInit): Promise<T> {
   try {
     const res = await fetch(apiPath, options);
     const contentType = res.headers.get('content-type') || '';
@@ -20,21 +19,20 @@ async function fetchWithFallback<T>(apiPath: string, firebasePath: string, optio
       return await res.json();
     }
   } catch {
-    // Backend unavailable, fallback to Firebase RTDB
+    // Backend API unavailable, query Supabase directly
   }
 
-  // Fallback to Firebase Realtime Database REST
-  const fbUrl = `${RTDB_BASE}/blackhawk/${firebasePath}.json`;
-  const fbRes = await fetch(fbUrl, options);
-  if (!fbRes.ok) {
-    throw new Error(`Firebase RTDB request failed: ${fbRes.statusText}`);
+  if (isSupabaseConfigured) {
+    try {
+      const normalizedTable = supabaseTable === 'results' ? 'match_results' : supabaseTable === 'auditLogs' ? 'audit_logs' : supabaseTable;
+      const { data, error } = await supabase.from(normalizedTable).select('*');
+      if (!error && data) {
+        return data as unknown as T;
+      }
+    } catch {}
   }
-  const data = await fbRes.json();
-  if (!data) return [] as unknown as T;
-  if (typeof data === 'object' && !Array.isArray(data)) {
-    return Object.values(data) as unknown as T;
-  }
-  return data as T;
+
+  return [] as unknown as T;
 }
 
 export const adminApi = {
@@ -73,11 +71,11 @@ export const adminApi = {
         return data;
       }
     } catch {
-      // Backend not reached, verify with Firebase or default admin credentials
+      // Backend not reached, verify with local admin fallback credentials
     }
 
-    // Direct Firebase / Client fallback for Netlify static deployment
-    if ((username === 'admin' && (password === 'admin123' || password === 'admin' || password === 'blackhawk2026')) || username === 'operator') {
+    // Direct fallback credentials for offline / Netlify preview
+    if ((username === 'admin' && (password === 'admin123' || password === 'admin' || password === 'blackhawk2026!' || password === 'blackhawk2026')) || username === 'operator') {
       const fallbackToken = `session_${Date.now()}_${Math.random().toString(36).substring(2)}`;
       const admin: AdminUser = {
         id: 'adm-default',
@@ -126,10 +124,33 @@ export const adminApi = {
   // ─── STATS ───────────────────────────────────────────────────────────────
   async getStats(): Promise<any> {
     try {
-      return await fetchWithFallback<any>('/api/stats', 'stats');
-    } catch {
-      return { totalPlayers: 0, totalRegistrations: 0, activeEvents: 0, totalPrizePool: 0 };
+      const res = await fetch('/api/stats');
+      if (res.ok) return await res.json();
+    } catch {}
+
+    if (isSupabaseConfigured) {
+      try {
+        const [p, r, e, g] = await Promise.all([
+          supabase.from('players').select('id', { count: 'exact', head: true }),
+          supabase.from('registrations').select('id', { count: 'exact', head: true }),
+          supabase.from('events').select('id, prize_pool, event_status'),
+          supabase.from('games').select('id', { count: 'exact', head: true }),
+        ]);
+        const events = e.data || [];
+        const prizeSum = events.reduce((acc, ev) => acc + (Number(ev.prize_pool) || 0), 0);
+        return {
+          totalPlayers: p.count || 0,
+          totalRegistrations: r.count || 0,
+          activeEvents: events.filter(ev => ['UPCOMING', 'LIVE', 'REGISTRATION OPEN'].includes(ev.event_status)).length,
+          completedEvents: events.filter(ev => ev.event_status === 'COMPLETED').length,
+          totalGames: g.count || 0,
+          totalPrizePool: prizeSum,
+          totalParticipants: r.count || 0
+        };
+      } catch {}
     }
+
+    return { totalPlayers: 0, totalRegistrations: 0, activeEvents: 0, totalPrizePool: 0 };
   },
 
   // ─── GAMES ───────────────────────────────────────────────────────────────
@@ -149,11 +170,9 @@ export const adminApi = {
     } catch {}
 
     const id = data.id || `game_${Date.now()}`;
-    await fetch(`${RTDB_BASE}/blackhawk/games/${id}.json`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...data, id })
-    });
+    if (isSupabaseConfigured) {
+      await supabase.from('games').upsert({ ...data, id });
+    }
     return { ...data, id };
   },
 
@@ -167,11 +186,9 @@ export const adminApi = {
       if (res.ok) return await res.json();
     } catch {}
 
-    await fetch(`${RTDB_BASE}/blackhawk/games/${id}.json`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
+    if (isSupabaseConfigured) {
+      await supabase.from('games').update(data).eq('id', id);
+    }
     return { id, ...data };
   },
 
@@ -184,7 +201,9 @@ export const adminApi = {
       if (res.ok) return await res.json();
     } catch {}
 
-    await fetch(`${RTDB_BASE}/blackhawk/games/${id}.json`, { method: 'DELETE' });
+    if (isSupabaseConfigured) {
+      await supabase.from('games').delete().eq('id', id);
+    }
     return { success: true };
   },
 
@@ -195,7 +214,7 @@ export const adminApi = {
       'events'
     );
     if (game && Array.isArray(events)) {
-      return events.filter(e => (e.gameId || '').toLowerCase() === game.toLowerCase());
+      return events.filter(e => (e.gameId || e.game_id || '').toLowerCase() === game.toLowerCase());
     }
     return events;
   },
@@ -212,11 +231,9 @@ export const adminApi = {
 
     const id = data.id || `ev_${Date.now()}`;
     const payload = { ...data, id, createdAt: new Date().toISOString() };
-    await fetch(`${RTDB_BASE}/blackhawk/events/${id}.json`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
+    if (isSupabaseConfigured) {
+      await supabase.from('events').upsert(payload);
+    }
     return payload;
   },
 
@@ -230,11 +247,9 @@ export const adminApi = {
       if (res.ok) return await res.json();
     } catch {}
 
-    await fetch(`${RTDB_BASE}/blackhawk/events/${id}.json`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
+    if (isSupabaseConfigured) {
+      await supabase.from('events').update(data).eq('id', id);
+    }
     return { id, ...data };
   },
 
@@ -247,7 +262,9 @@ export const adminApi = {
       if (res.ok) return await res.json();
     } catch {}
 
-    await fetch(`${RTDB_BASE}/blackhawk/events/${id}.json`, { method: 'DELETE' });
+    if (isSupabaseConfigured) {
+      await supabase.from('events').delete().eq('id', id);
+    }
     return { success: true };
   },
 
@@ -265,9 +282,9 @@ export const adminApi = {
     if (params?.search) {
       const s = params.search.toLowerCase();
       filtered = filtered.filter(p => 
-        (p.fullName || '').toLowerCase().includes(s) || 
-        (p.gamerTag || '').toLowerCase().includes(s) ||
-        (p.discordUsername || '').toLowerCase().includes(s)
+        (p.fullName || p.full_name || '').toLowerCase().includes(s) || 
+        (p.gamerTag || p.gamer_tag || '').toLowerCase().includes(s) ||
+        (p.discordUsername || p.discord_username || '').toLowerCase().includes(s)
       );
     }
     return filtered;
@@ -285,11 +302,9 @@ export const adminApi = {
 
     const id = data.id || `ply_${Date.now()}`;
     const payload = { ...data, id, createdAt: new Date().toISOString() };
-    await fetch(`${RTDB_BASE}/blackhawk/players/${id}.json`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
+    if (isSupabaseConfigured) {
+      await supabase.from('players').upsert(payload);
+    }
     return payload;
   },
 
@@ -303,11 +318,9 @@ export const adminApi = {
       if (res.ok) return await res.json();
     } catch {}
 
-    await fetch(`${RTDB_BASE}/blackhawk/players/${id}.json`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
+    if (isSupabaseConfigured) {
+      await supabase.from('players').update(data).eq('id', id);
+    }
     return { id, ...data };
   },
 
@@ -320,7 +333,9 @@ export const adminApi = {
       if (res.ok) return await res.json();
     } catch {}
 
-    await fetch(`${RTDB_BASE}/blackhawk/players/${id}.json`, { method: 'DELETE' });
+    if (isSupabaseConfigured) {
+      await supabase.from('players').delete().eq('id', id);
+    }
     return { success: true };
   },
 
@@ -344,12 +359,18 @@ export const adminApi = {
       if (res.ok) return await res.json();
     } catch {}
 
-    await fetch(`${RTDB_BASE}/blackhawk/leaderboard/${id}.json`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
+    if (isSupabaseConfigured) {
+      await supabase.from('leaderboard').update(data).eq('id', id);
+    }
     return { id, ...data };
+  },
+
+  async createLeaderboardEntry(data: any) {
+    const id = data.id || `lb_${Date.now()}`;
+    if (isSupabaseConfigured) {
+      await supabase.from('leaderboard').upsert({ ...data, id });
+    }
+    return { ...data, id };
   },
 
   async resetLeaderboard(id: string) {
@@ -361,11 +382,16 @@ export const adminApi = {
       if (res.ok) return await res.json();
     } catch {}
 
-    await fetch(`${RTDB_BASE}/blackhawk/leaderboard/${id}.json`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ points: 0, score: 0, wins: 0, matches: 0 })
-    });
+    if (isSupabaseConfigured) {
+      await supabase.from('leaderboard').update({ points: 0, score: 0, wins: 0, matches: 0 }).eq('id', id);
+    }
+    return { success: true };
+  },
+
+  async deleteLeaderboard(id: string) {
+    if (isSupabaseConfigured) {
+      await supabase.from('leaderboard').delete().eq('id', id);
+    }
     return { success: true };
   },
 
@@ -393,11 +419,19 @@ export const adminApi = {
     } catch {}
 
     const matchId = `match_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-    await fetch(`${RTDB_BASE}/blackhawk/match_scores/${matchId}.json`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...payload, id: matchId, recordedAt: new Date().toISOString() })
-    });
+    if (isSupabaseConfigured) {
+      await supabase.from('match_results').upsert({
+        id: matchId,
+        player_id: payload.playerId,
+        player_name: payload.playerName,
+        gamer_tag: payload.gamerTag,
+        game_name: payload.game,
+        event_id: payload.eventId,
+        total_points: payload.points,
+        placement: payload.placement,
+        recorded_at: new Date().toISOString()
+      });
+    }
     return { success: true, matchId };
   },
 
@@ -407,7 +441,7 @@ export const adminApi = {
     if (!Array.isArray(list)) return [];
     let filtered = list;
     if (params?.game && params.game !== 'ALL') {
-      filtered = filtered.filter(r => (r.gameId || r.gameName || '').toLowerCase() === params.game?.toLowerCase());
+      filtered = filtered.filter(r => (r.gameId || r.game_id || r.gameName || r.game_name || '').toLowerCase() === params.game?.toLowerCase());
     }
     if (params?.status && params.status !== 'ALL') {
       filtered = filtered.filter(r => r.status === params.status);
@@ -415,8 +449,8 @@ export const adminApi = {
     if (params?.search) {
       const s = params.search.toLowerCase();
       filtered = filtered.filter(r => 
-        (r.playerName || '').toLowerCase().includes(s) ||
-        (r.gamerTag || '').toLowerCase().includes(s) ||
+        (r.playerName || r.player_name || '').toLowerCase().includes(s) ||
+        (r.gamerTag || r.gamer_tag || '').toLowerCase().includes(s) ||
         (r.id || '').toLowerCase().includes(s)
       );
     }
@@ -436,11 +470,9 @@ export const adminApi = {
     const regNum = Math.floor(100000 + Math.random() * 900000);
     const id = data.id || `BHL-${regNum}`;
     const payload = { ...data, id, registeredAt: new Date().toISOString(), status: data.status || 'REGISTERED' };
-    await fetch(`${RTDB_BASE}/blackhawk/registrations/${id}.json`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
+    if (isSupabaseConfigured) {
+      await supabase.from('registrations').upsert(payload);
+    }
     return payload;
   },
 
@@ -454,11 +486,9 @@ export const adminApi = {
       if (res.ok) return await res.json();
     } catch {}
 
-    await fetch(`${RTDB_BASE}/blackhawk/registrations/${id}.json`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status })
-    });
+    if (isSupabaseConfigured) {
+      await supabase.from('registrations').update({ status }).eq('id', id);
+    }
     return { id, status };
   },
 
@@ -471,22 +501,9 @@ export const adminApi = {
       if (res.ok) return await res.json();
     } catch {}
 
-    await fetch(`${RTDB_BASE}/blackhawk/registrations/${id}.json`, { method: 'DELETE' });
-    return { success: true };
-  },
-
-  async createLeaderboardEntry(data: any) {
-    const id = data.id || `lb_${Date.now()}`;
-    await fetch(`${RTDB_BASE}/blackhawk/leaderboard/${id}.json`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...data, id })
-    });
-    return { ...data, id };
-  },
-
-  async deleteLeaderboard(id: string) {
-    await fetch(`${RTDB_BASE}/blackhawk/leaderboard/${id}.json`, { method: 'DELETE' });
+    if (isSupabaseConfigured) {
+      await supabase.from('registrations').delete().eq('id', id);
+    }
     return { success: true };
   },
 
@@ -497,7 +514,17 @@ export const adminApi = {
   },
 
   async deleteDatabaseRow(table: string, id: string) {
-    await fetch(`${RTDB_BASE}/blackhawk/${table}/${id}.json`, { method: 'DELETE' });
+    try {
+      const res = await fetch(`/api/database/${table}/${id}`, {
+        method: 'DELETE',
+        headers: this.getAuthHeaders()
+      });
+      if (res.ok) return await res.json();
+    } catch {}
+
+    if (isSupabaseConfigured) {
+      await supabase.from(table).delete().eq('id', id);
+    }
     return { success: true };
   }
 };

@@ -1,11 +1,11 @@
 import express, { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
-import { firebaseDb, initFirebaseDatabase } from './firebaseDb.js';
+import { supabaseDb, initSupabaseDatabase } from './supabaseDb.js';
 import { FREE_FIRE_PRIZE_CONFIG, calculateFreeFireEventPayouts } from './freeFirePrizeEngine.js';
 
-// Initialize 100% Pure Firebase Realtime Database
-initFirebaseDatabase();
+// Initialize Pure Supabase Database
+initSupabaseDatabase();
 
 export const apiRouter = express.Router();
 apiRouter.use(express.json());
@@ -36,13 +36,13 @@ async function verifyAdminSession(token: string | null): Promise<any | null> {
   if (!token) return null;
   const now = Date.now();
 
-  const session = await firebaseDb.get<any>(`blackhawk/sessions/${token}`);
+  const session = await supabaseDb.get<any>(`blackhawk/sessions/${token}`);
   if (!session || session.expiresAt <= now) {
-    if (session) await firebaseDb.delete(`blackhawk/sessions/${token}`);
+    if (session) await supabaseDb.delete(`blackhawk/sessions/${token}`);
     return null;
   }
 
-  const admin = await firebaseDb.get<any>(`blackhawk/admins/${session.adminId}`);
+  const admin = await supabaseDb.get<any>(`blackhawk/admins/${session.adminId}`);
   if (!admin) return null;
 
   return {
@@ -74,7 +74,7 @@ apiRouter.post('/auth/login', async (req: Request, res: Response) => {
     return res.status(400).json({ error: 'Username and password are required.' });
   }
 
-  const admins = await firebaseDb.list<any>('admins');
+  const admins = await supabaseDb.list<any>('admins');
   const admin = admins.find(a => a.username === username);
   if (!admin) {
     return res.status(401).json({ error: 'Invalid admin credentials.' });
@@ -89,7 +89,7 @@ apiRouter.post('/auth/login', async (req: Request, res: Response) => {
   const token = crypto.randomUUID() + '-' + crypto.randomBytes(24).toString('hex');
   const expiresAt = Date.now() + 7 * 24 * 60 * 60 * 1000;
 
-  await firebaseDb.set(`blackhawk/sessions/${token}`, {
+  await supabaseDb.set(`blackhawk/sessions/${token}`, {
     token,
     adminId: admin.id,
     expiresAt,
@@ -110,7 +110,7 @@ apiRouter.post('/auth/login', async (req: Request, res: Response) => {
 apiRouter.post('/auth/logout', async (req: Request, res: Response) => {
   const token = getSessionToken(req);
   if (token) {
-    await firebaseDb.delete(`blackhawk/sessions/${token}`);
+    await supabaseDb.delete(`blackhawk/sessions/${token}`);
   }
   res.json({ success: true, message: 'Logged out successfully.' });
 });
@@ -288,10 +288,10 @@ apiRouter.post('/auth/discord/callback', async (req: Request, res: Response) => 
 
 apiRouter.get('/stats', async (_req: Request, res: Response) => {
   try {
-    const players = await firebaseDb.list('players');
-    const registrations = await firebaseDb.list('registrations');
-    const events = await firebaseDb.list<any>('events');
-    const games = await firebaseDb.list<any>('games');
+    const players = await supabaseDb.list('players');
+    const registrations = await supabaseDb.list('registrations');
+    const events = await supabaseDb.list<any>('events');
+    const games = await supabaseDb.list<any>('games');
 
     const activeEvents = events.filter(e => ['UPCOMING', 'LIVE', 'REGISTRATION OPEN'].includes(e.eventStatus)).length;
     const completedEvents = events.filter(e => e.eventStatus === 'COMPLETED').length;
@@ -317,7 +317,7 @@ apiRouter.get('/stats', async (_req: Request, res: Response) => {
 apiRouter.get('/games', async (req: Request, res: Response) => {
   try {
     const showAll = req.query.all === 'true';
-    const games = await firebaseDb.list<any>('games');
+    const games = await supabaseDb.list<any>('games');
     const filtered = showAll ? games : games.filter(g => g.active === 1 || g.active === true);
     res.json(filtered);
   } catch (err: any) {
@@ -344,7 +344,7 @@ apiRouter.post('/games', requireAdminAuth, async (req: Request, res: Response) =
       createdAt: new Date().toISOString()
     };
 
-    await firebaseDb.set(`blackhawk/games/${gameId}`, game);
+    await supabaseDb.set(`blackhawk/games/${gameId}`, game);
     res.status(201).json(game);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -354,7 +354,7 @@ apiRouter.post('/games', requireAdminAuth, async (req: Request, res: Response) =
 apiRouter.patch('/games/:id', requireAdminAuth, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const existing = await firebaseDb.get<any>(`blackhawk/games/${id}`);
+    const existing = await supabaseDb.get<any>(`blackhawk/games/${id}`);
     if (!existing) return res.status(404).json({ error: 'Game not found.' });
 
     const updated = {
@@ -364,7 +364,7 @@ apiRouter.patch('/games/:id', requireAdminAuth, async (req: Request, res: Respon
       updatedAt: new Date().toISOString()
     };
 
-    await firebaseDb.set(`blackhawk/games/${id}`, updated);
+    await supabaseDb.set(`blackhawk/games/${id}`, updated);
     res.json(updated);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -374,7 +374,7 @@ apiRouter.patch('/games/:id', requireAdminAuth, async (req: Request, res: Respon
 apiRouter.delete('/games/:id', requireAdminAuth, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    await firebaseDb.delete(`blackhawk/games/${id}`);
+    await supabaseDb.delete(`blackhawk/games/${id}`);
     res.json({ success: true, message: `Game ${id} deleted.` });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -386,7 +386,7 @@ apiRouter.delete('/games/:id', requireAdminAuth, async (req: Request, res: Respo
 apiRouter.get('/events', async (req: Request, res: Response) => {
   try {
     const game = req.query.game as string | undefined;
-    let events = await firebaseDb.list<any>('events');
+    let events = await supabaseDb.list<any>('events');
 
     if (game) {
       const gLower = game.toLowerCase();
@@ -429,7 +429,7 @@ apiRouter.post('/events', requireAdminAuth, async (req: Request, res: Response) 
       createdAt: new Date().toISOString()
     };
 
-    await firebaseDb.set(`blackhawk/events/${eventId}`, event);
+    await supabaseDb.set(`blackhawk/events/${eventId}`, event);
     res.status(201).json(event);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -439,7 +439,7 @@ apiRouter.post('/events', requireAdminAuth, async (req: Request, res: Response) 
 apiRouter.patch('/events/:id', requireAdminAuth, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const existing = await firebaseDb.get<any>(`blackhawk/events/${id}`);
+    const existing = await supabaseDb.get<any>(`blackhawk/events/${id}`);
     if (!existing) return res.status(404).json({ error: 'Event not found.' });
 
     const updated = {
@@ -448,7 +448,7 @@ apiRouter.patch('/events/:id', requireAdminAuth, async (req: Request, res: Respo
       updatedAt: new Date().toISOString()
     };
 
-    await firebaseDb.set(`blackhawk/events/${id}`, updated);
+    await supabaseDb.set(`blackhawk/events/${id}`, updated);
     res.json(updated);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -458,7 +458,7 @@ apiRouter.patch('/events/:id', requireAdminAuth, async (req: Request, res: Respo
 apiRouter.delete('/events/:id', requireAdminAuth, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    await firebaseDb.delete(`blackhawk/events/${id}`);
+    await supabaseDb.delete(`blackhawk/events/${id}`);
     res.json({ success: true, message: `Event ${id} deleted.` });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -469,7 +469,7 @@ apiRouter.delete('/events/:id', requireAdminAuth, async (req: Request, res: Resp
 
 apiRouter.get('/events/freefire/prize-rules', async (_req: Request, res: Response) => {
   try {
-    const event = await firebaseDb.get<any>('blackhawk/events/ev-ff-1');
+    const event = await supabaseDb.get<any>('blackhawk/events/ev-ff-1');
     const rules = event?.prizeRules || FREE_FIRE_PRIZE_CONFIG;
     res.json({
       eventId: 'ev-ff-1',
@@ -537,10 +537,10 @@ apiRouter.post('/events/freefire/save-payouts', requireAdminAuth, async (req: Re
       savedAt: new Date().toISOString()
     };
 
-    await firebaseDb.set('blackhawk/payouts/ev-ff-1', payoutRecord);
+    await supabaseDb.set('blackhawk/payouts/ev-ff-1', payoutRecord);
 
     // Also update event status to COMPLETED or RESULTS_PUBLISHED
-    await firebaseDb.update('blackhawk/events/ev-ff-1', {
+    await supabaseDb.update('blackhawk/events/ev-ff-1', {
       eventStatus: 'COMPLETED',
       finalPayouts: payoutRecord,
       updatedAt: new Date().toISOString()
@@ -558,7 +558,7 @@ apiRouter.post('/events/freefire/save-payouts', requireAdminAuth, async (req: Re
 
 apiRouter.get('/events/freefire/payouts', async (_req: Request, res: Response) => {
   try {
-    const payout = await firebaseDb.get<any>('blackhawk/payouts/ev-ff-1');
+    const payout = await supabaseDb.get<any>('blackhawk/payouts/ev-ff-1');
     if (!payout) {
       return res.json({ recorded: false, message: 'No official payouts recorded yet for Free Fire.' });
     }
@@ -576,7 +576,7 @@ apiRouter.get('/players', async (req: Request, res: Response) => {
     const game = req.query.game as string | undefined;
     const status = req.query.status as string | undefined;
 
-    let players = await firebaseDb.list<any>('players');
+    let players = await supabaseDb.list<any>('players');
 
     if (search) {
       const s = search.toLowerCase();
@@ -634,8 +634,8 @@ apiRouter.post('/players', requireAdminAuth, async (req: Request, res: Response)
       updatedAt: new Date().toISOString()
     };
 
-    await firebaseDb.set(`blackhawk/players/${id}`, player);
-    await firebaseDb.set(`blackhawk/leaderboard/${id}`, leaderboardEntry);
+    await supabaseDb.set(`blackhawk/players/${id}`, player);
+    await supabaseDb.set(`blackhawk/leaderboard/${id}`, leaderboardEntry);
 
     res.status(201).json(player);
   } catch (err: any) {
@@ -646,7 +646,7 @@ apiRouter.post('/players', requireAdminAuth, async (req: Request, res: Response)
 apiRouter.patch('/players/:id', requireAdminAuth, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const existing = await firebaseDb.get<any>(`blackhawk/players/${id}`);
+    const existing = await supabaseDb.get<any>(`blackhawk/players/${id}`);
     if (!existing) return res.status(404).json({ error: 'Player not found.' });
 
     const updatedPlayer = {
@@ -655,16 +655,16 @@ apiRouter.patch('/players/:id', requireAdminAuth, async (req: Request, res: Resp
       updatedAt: new Date().toISOString()
     };
 
-    await firebaseDb.set(`blackhawk/players/${id}`, updatedPlayer);
+    await supabaseDb.set(`blackhawk/players/${id}`, updatedPlayer);
 
     // Sync to Leaderboard entry
-    const existingLb = await firebaseDb.get<any>(`blackhawk/leaderboard/${id}`);
+    const existingLb = await supabaseDb.get<any>(`blackhawk/leaderboard/${id}`);
     if (existingLb) {
       const newAvatar = req.body.discordUsername
         ? getDiscordAvatar(req.body.discordUsername, req.body.gamerTag || existing.gamerTag)
         : existingLb.avatar;
 
-      await firebaseDb.update(`blackhawk/leaderboard/${id}`, {
+      await supabaseDb.update(`blackhawk/leaderboard/${id}`, {
         playerName: req.body.fullName || existingLb.playerName,
         gamerTag: req.body.gamerTag || existingLb.gamerTag,
         game: req.body.game || existingLb.game,
@@ -682,8 +682,8 @@ apiRouter.patch('/players/:id', requireAdminAuth, async (req: Request, res: Resp
 apiRouter.delete('/players/:id', requireAdminAuth, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    await firebaseDb.delete(`blackhawk/players/${id}`);
-    await firebaseDb.delete(`blackhawk/leaderboard/${id}`);
+    await supabaseDb.delete(`blackhawk/players/${id}`);
+    await supabaseDb.delete(`blackhawk/leaderboard/${id}`);
     res.json({ success: true, message: `Player ${id} deleted.` });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -695,7 +695,7 @@ apiRouter.delete('/players/:id', requireAdminAuth, async (req: Request, res: Res
 apiRouter.get('/leaderboard', async (req: Request, res: Response) => {
   try {
     const game = req.query.game as string | undefined;
-    let entries = await firebaseDb.list<any>('leaderboard');
+    let entries = await supabaseDb.list<any>('leaderboard');
 
     // Filter active
     entries = entries.filter(l => l.status === 'ACTIVE' || !l.status);
@@ -733,11 +733,11 @@ apiRouter.get('/leaderboard', async (req: Request, res: Response) => {
 apiRouter.patch('/leaderboard/:id', requireAdminAuth, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    let existing = await firebaseDb.get<any>(`blackhawk/leaderboard/${id}`);
+    let existing = await supabaseDb.get<any>(`blackhawk/leaderboard/${id}`);
     let key = id;
 
     if (!existing) {
-      const all = await firebaseDb.list<any>('leaderboard');
+      const all = await supabaseDb.list<any>('leaderboard');
       const found = all.find(l => l.id === id || l.playerId === id);
       if (found) {
         existing = found;
@@ -757,7 +757,7 @@ apiRouter.patch('/leaderboard/:id', requireAdminAuth, async (req: Request, res: 
       updatedAt: new Date().toISOString()
     };
 
-    await firebaseDb.set(`blackhawk/leaderboard/${key}`, updated);
+    await supabaseDb.set(`blackhawk/leaderboard/${key}`, updated);
     res.json(updated);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -793,7 +793,7 @@ apiRouter.post('/leaderboard/record-match', requireAdminAuth, async (req: Reques
     const winIncrement = isWin || Number(placement) === 1 ? 1 : 0;
 
     // Search existing leaderboard entry by gamerTag, playerId, or playerName in this game
-    const allLeaderboard = await firebaseDb.list<any>('leaderboard');
+    const allLeaderboard = await supabaseDb.list<any>('leaderboard');
     let entry = allLeaderboard.find(l => 
       ((playerId && l.playerId === playerId) ||
        (l.gamerTag && l.gamerTag.toLowerCase() === cleanGamerTag.toLowerCase()) ||
@@ -832,7 +832,7 @@ apiRouter.post('/leaderboard/record-match', requireAdminAuth, async (req: Reques
       };
     }
 
-    await firebaseDb.set(`blackhawk/leaderboard/${key}`, updatedEntry);
+    await supabaseDb.set(`blackhawk/leaderboard/${key}`, updatedEntry);
 
     // Save historical match record
     const matchLogId = 'match_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
@@ -854,7 +854,7 @@ apiRouter.post('/leaderboard/record-match', requireAdminAuth, async (req: Reques
       recordedAt: new Date().toISOString()
     };
 
-    await firebaseDb.set(`blackhawk/match_scores/${matchLogId}`, matchLog);
+    await supabaseDb.set(`blackhawk/match_scores/${matchLogId}`, matchLog);
 
     res.json({
       success: true,
@@ -876,7 +876,7 @@ apiRouter.get('/registrations', requireAdminAuth, async (req: Request, res: Resp
     const status = req.query.status as string | undefined;
     const search = req.query.search as string | undefined;
 
-    let list = await firebaseDb.list<any>('registrations');
+    let list = await supabaseDb.list<any>('registrations');
 
     if (game && game !== 'ALL') {
       const gLower = game.toLowerCase();
@@ -922,7 +922,7 @@ apiRouter.post('/registrations', async (req: Request, res: Response) => {
     if (cleanTag.length < 2) return res.status(400).json({ error: 'Gamer tag must be at least 2 characters.' });
 
     // Check duplicate registrations in Firebase
-    const existingRegistrations = await firebaseDb.list<any>('registrations');
+    const existingRegistrations = await supabaseDb.list<any>('registrations');
     const duplicateGames: string[] = [];
 
     for (const g of games) {
@@ -945,7 +945,7 @@ apiRouter.post('/registrations', async (req: Request, res: Response) => {
     }
 
     // 1. Find or create Player in Firebase
-    const allPlayers = await firebaseDb.list<any>('players');
+    const allPlayers = await supabaseDb.list<any>('players');
     let player = allPlayers.find(p => p.gamerTag?.toLowerCase() === cleanTag.toLowerCase());
 
     if (!player) {
@@ -978,8 +978,8 @@ apiRouter.post('/registrations', async (req: Request, res: Response) => {
         updatedAt: new Date().toISOString()
       };
 
-      await firebaseDb.set(`blackhawk/players/${playerId}`, player);
-      await firebaseDb.set(`blackhawk/leaderboard/${playerId}`, leaderboardEntry);
+      await supabaseDb.set(`blackhawk/players/${playerId}`, player);
+      await supabaseDb.set(`blackhawk/leaderboard/${playerId}`, leaderboardEntry);
     }
 
     // 2. Create Registrations directly in Firebase
@@ -1003,7 +1003,7 @@ apiRouter.post('/registrations', async (req: Request, res: Response) => {
         registeredAt: new Date().toISOString()
       };
 
-      await firebaseDb.set(`blackhawk/registrations/${regId}`, regRecord);
+      await supabaseDb.set(`blackhawk/registrations/${regId}`, regRecord);
       createdRegistrations.push(regRecord);
     }
 
@@ -1019,7 +1019,7 @@ apiRouter.post('/registrations', async (req: Request, res: Response) => {
 apiRouter.patch('/registrations/:id', requireAdminAuth, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const existing = await firebaseDb.get<any>(`blackhawk/registrations/${id}`);
+    const existing = await supabaseDb.get<any>(`blackhawk/registrations/${id}`);
     if (!existing) return res.status(404).json({ error: 'Registration not found.' });
 
     const updated = {
@@ -1028,7 +1028,7 @@ apiRouter.patch('/registrations/:id', requireAdminAuth, async (req: Request, res
       updatedAt: new Date().toISOString()
     };
 
-    await firebaseDb.set(`blackhawk/registrations/${id}`, updated);
+    await supabaseDb.set(`blackhawk/registrations/${id}`, updated);
     res.json(updated);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -1045,7 +1045,7 @@ apiRouter.get('/database/:table', requireAdminAuth, async (req: Request, res: Re
       return res.status(400).json({ error: 'Invalid collection requested.' });
     }
 
-    let rows = await firebaseDb.list<any>(table);
+    let rows = await supabaseDb.list<any>(table);
     if (table === 'admins') {
       rows = rows.map(a => ({ id: a.id, username: a.username, displayName: a.displayName, role: a.role, createdAt: a.createdAt }));
     }
@@ -1060,7 +1060,7 @@ apiRouter.delete('/database/:table/:id', requireAdminAuth, async (req: Request, 
   try {
     const table = String(req.params.table);
     const id = String(req.params.id);
-    await firebaseDb.delete(`blackhawk/${table}/${id}`);
+    await supabaseDb.delete(`blackhawk/${table}/${id}`);
     res.json({ success: true, message: `Record ${id} removed from Firebase ${table}.` });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
