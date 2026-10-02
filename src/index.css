@@ -170,6 +170,84 @@
   filter: drop-shadow(0 0 20px rgba(215, 25, 32, 0.45));
 }
 
+/* ─── Premium Text-Only Intro Animations ─── */
+@keyframes introEyebrowReveal {
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes introMaskWipe {
+  0% {
+    clip-path: inset(0 100% 0 0);
+    opacity: 0;
+    transform: translateX(-6px);
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    clip-path: inset(0 0% 0 0);
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes introRedSweepSingle {
+  0% {
+    background-position: 150% 0;
+  }
+  100% {
+    background-position: -150% 0;
+  }
+}
+
+@keyframes introTaglineReveal {
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.intro-eyebrow {
+  animation: introEyebrowReveal 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both;
+}
+
+.intro-title {
+  animation: introMaskWipe 0.65s cubic-bezier(0.16, 1, 0.3, 1) 0.38s both;
+}
+
+.intro-sweep-text {
+  background: linear-gradient(
+    90deg,
+    #ffffff 0%,
+    #ffffff 38%,
+    #ff4d4d 48%,
+    #D71920 52%,
+    #ff4d4d 56%,
+    #ffffff 66%,
+    #ffffff 100%
+  );
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: introRedSweepSingle 0.8s cubic-bezier(0.25, 1, 0.5, 1) 0.75s 1 normal forwards;
+}
+
+.intro-tagline {
+  animation: introTaglineReveal 0.5s cubic-bezier(0.16, 1, 0.3, 1) 1.1s both;
+}
+
 /* ─── Hero Cinematic Entrance Sequence (Clean Sequential Choreography) ─── */
 
 /* 1. Eyebrow: Fade and gently lift in "DISCORD GAMING COMMUNITY" */
@@ -349,6 +427,10 @@
 
 /* ─── Reduced Motion Support ─── */
 @media (prefers-reduced-motion: reduce) {
+  .intro-eyebrow,
+  .intro-title,
+  .intro-sweep-text,
+  .intro-tagline,
   .animate-hero-eyebrow,
   .animate-hero-crest,
   .animate-hero-headline,
@@ -367,6 +449,7 @@
     opacity: 1 !important;
     transform: none !important;
     filter: none !important;
+    clip-path: none !important;
   }
 }
 

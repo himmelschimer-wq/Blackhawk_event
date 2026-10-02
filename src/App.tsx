@@ -177,10 +177,10 @@ export function App() {
   // Otherwise, render Public BlackHawk Gaming Experience
   return (
     <div className="min-h-screen bg-[#080808] text-[#e5e5e5] font-sans antialiased selection:bg-[#D71920] selection:text-white">
-      {/* Animated Graphics Flash Splash with Dual Crossed Swords & BlackHawk Typography */}
+      {/* Premium Text-Only BlackHawk Intro */}
       {showIntroSplash && (
         <IntroSplash 
-          durationMs={2800} 
+          durationMs={2000} 
           onStartReveal={() => setSiteRevealed(true)}
           onComplete={() => {
             setShowIntroSplash(false);
