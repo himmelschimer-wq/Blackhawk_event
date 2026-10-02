@@ -135,21 +135,35 @@
   }
 }
 
-/* ─── Refined Ruby Crimson Gradient for Static & Animated States ─── */
+/* ─── Refined Ruby Crimson Gradient with Dynamic Light Sweep Shine ─── */
+@keyframes blackhawkTextShine {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
 .text-red-white-shine {
   background: linear-gradient(
-    125deg,
-    #ffffff 0%,
-    #e2e8f0 18%,
-    #ff4d4d 45%,
-    #D71920 70%,
-    #8B0000 100%
+    115deg,
+    #9e0b12 0%,
+    #d71920 20%,
+    #ff6b6b 35%,
+    #ffffff 48%,
+    #ffffff 52%,
+    #ff6b6b 65%,
+    #d71920 80%,
+    #9e0b12 100%
   );
+  background-size: 280% 100%;
   color: transparent;
   -webkit-background-clip: text;
   background-clip: text;
+  animation: blackhawkTextShine 4.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
   display: inline-block;
-  filter: drop-shadow(0 0 20px rgba(215, 25, 32, 0.35));
+  filter: drop-shadow(0 0 20px rgba(215, 25, 32, 0.45));
 }
 
 /* ─── Hero Cinematic Entrance Sequence (1.0s – 1.4s Total Orchestration) ─── */

@@ -30,7 +30,7 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-5 overflow-y-auto">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-0 sm:p-5 overflow-y-auto">
       {/* Dark Backdrop with subtle blur */}
       <div
         className="fixed inset-0 bg-black/85 backdrop-blur-md transition-opacity"
