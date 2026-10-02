@@ -174,13 +174,14 @@ export function App() {
 
   const [siteRevealed, setSiteRevealed] = useState(false);
 
-  // Otherwise, render Public BlackHawk Esports Experience
+  // Otherwise, render Public BlackHawk Gaming Experience
   return (
     <div className="min-h-screen bg-[#080808] text-[#e5e5e5] font-sans antialiased selection:bg-[#D71920] selection:text-white">
-      {/* 3-Second Animated Graphics Flash Splash with Dual Crossed Swords & BlackHawk Typography */}
+      {/* Animated Graphics Flash Splash with Dual Crossed Swords & BlackHawk Typography */}
       {showIntroSplash && (
         <IntroSplash 
-          durationMs={3000} 
+          durationMs={2800} 
+          onStartReveal={() => setSiteRevealed(true)}
           onComplete={() => {
             setShowIntroSplash(false);
             setSiteRevealed(true);
@@ -188,17 +189,16 @@ export function App() {
         />
       )}
 
-      {/* Minimal Fixed Navigation Bar */}
-      <div className={siteRevealed ? 'animate-site-navbar' : ''}>
-        <Navbar
-          onRegisterClick={() => openRegistration()}
-          onNavigate={scrollToSection}
-          onOpenRules={() => setIsRulesModalOpen(true)}
-          onOpenAbout={() => setIsAboutModalOpen(true)}
-        />
-      </div>
+      {/* Minimal Fixed Navigation Bar (Fixed top-0) */}
+      <Navbar
+        isRevealed={siteRevealed}
+        onRegisterClick={() => openRegistration()}
+        onNavigate={scrollToSection}
+        onOpenRules={() => setIsRulesModalOpen(true)}
+        onOpenAbout={() => setIsAboutModalOpen(true)}
+      />
 
-      <main>
+      <main className={`transition-opacity duration-300 ${siteRevealed ? 'opacity-100' : 'opacity-0'}`}>
         {/* Asymmetric Cinematic Hero Section */}
         <Hero
           isRevealed={siteRevealed}
@@ -207,7 +207,7 @@ export function App() {
         />
 
         {/* Choose Your Game Section */}
-        <div className={siteRevealed ? 'animate-site-content' : ''}>
+        <div className={siteRevealed ? 'animate-site-content' : 'opacity-0'}>
           <ChooseYourGame
             selectedGame={activeGameFilter !== 'ALL' ? activeGameFilter : undefined}
             onSelectGame={(gameName) => {
@@ -222,7 +222,7 @@ export function App() {
         </div>
 
         {/* Upcoming Events Editorial Table & Leaderboard */}
-        <div className={siteRevealed ? 'animate-site-content' : ''}>
+        <div className={siteRevealed ? 'animate-site-content' : 'opacity-0'}>
           <UpcomingEventsAndLeaderboard
             activeGameFilter={activeGameFilter}
             onSelectGameFilter={(gameName) => setActiveGameFilter(gameName)}
@@ -241,7 +241,7 @@ export function App() {
       </main>
 
       {/* Clean Minimal Footer */}
-      <div className={siteRevealed ? 'animate-site-footer' : ''}>
+      <div className={siteRevealed ? 'animate-site-footer' : 'opacity-0'}>
         <Footer
           onNavigate={scrollToSection}
           onOpenRules={() => setIsRulesModalOpen(true)}
@@ -249,14 +249,13 @@ export function App() {
         />
       </div>
 
-      {/* Floating Mobile Bottom Navigation Dock */}
-      <div className={siteRevealed ? 'animate-site-bottomnav' : ''}>
-        <MobileBottomBar
-          onRegisterClick={() => scrollToSection('events')}
-          onNavigate={scrollToSection}
-          onOpenRules={() => setIsRulesModalOpen(true)}
-        />
-      </div>
+      {/* Floating Mobile Bottom Navigation Dock (Fixed bottom-3) */}
+      <MobileBottomBar
+        isRevealed={siteRevealed}
+        onRegisterClick={() => scrollToSection('events')}
+        onNavigate={scrollToSection}
+        onOpenRules={() => setIsRulesModalOpen(true)}
+      />
 
       {/* Event-Specific & BlackHawk General Rules Briefing Modal */}
       <EventRulesBriefingModal

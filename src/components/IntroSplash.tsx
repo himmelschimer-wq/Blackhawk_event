@@ -2,11 +2,13 @@ import React, { useState, useEffect } from 'react';
 
 interface IntroSplashProps {
   onComplete: () => void;
+  onStartReveal?: () => void;
   durationMs?: number;
 }
 
 export const IntroSplash: React.FC<IntroSplashProps> = ({ 
   onComplete, 
+  onStartReveal,
   durationMs = 2800 
 }) => {
   const [clashed, setClashed] = useState(false);
@@ -27,12 +29,13 @@ export const IntroSplash: React.FC<IntroSplashProps> = ({
       setProgress(pct);
     }, 16);
 
-    // 3. Smooth cinematic fadeout before end
+    // 3. Smooth cinematic fadeout before end & trigger background page reveal
     const fadeTimer = setTimeout(() => {
       setFadingOut(true);
-    }, durationMs - 400);
+      if (onStartReveal) onStartReveal();
+    }, durationMs - 450);
 
-    // 4. Complete transition
+    // 4. Complete transition & unmount
     const doneTimer = setTimeout(() => {
       onComplete();
     }, durationMs);
@@ -51,10 +54,11 @@ export const IntroSplash: React.FC<IntroSplashProps> = ({
       clearInterval(interval);
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [durationMs, onComplete]);
+  }, [durationMs, onComplete, onStartReveal]);
 
   const handleSkip = () => {
     setFadingOut(true);
+    if (onStartReveal) onStartReveal();
     setTimeout(() => {
       onComplete();
     }, 180);

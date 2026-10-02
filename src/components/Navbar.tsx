@@ -7,6 +7,7 @@ interface NavbarProps {
   onNavigate?: (sectionId: string) => void;
   onOpenRules?: () => void;
   onOpenAbout?: () => void;
+  isRevealed?: boolean;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -14,6 +15,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onNavigate,
   onOpenRules,
   onOpenAbout,
+  isRevealed = true,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -57,6 +59,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   return (
     <header
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+        isRevealed ? 'animate-site-navbar' : 'opacity-0 pointer-events-none'
+      } ${
         scrolled
           ? 'bg-[#080808]/92 backdrop-blur-md border-b border-white/5 py-3 shadow-[0_4px_25px_rgba(0,0,0,0.8)]'
           : 'bg-[#080808]/75 backdrop-blur-sm border-b border-white/[0.04] py-3.5'

@@ -6,15 +6,19 @@ interface MobileBottomBarProps {
   onRegisterClick: () => void;
   onNavigate: (sectionId: string) => void;
   onOpenRules: () => void;
+  isRevealed?: boolean;
 }
 
 export const MobileBottomBar: React.FC<MobileBottomBarProps> = ({
   onRegisterClick,
   onNavigate,
   onOpenRules,
+  isRevealed = true,
 }) => {
   return (
-    <div className="sm:hidden fixed bottom-3 inset-x-3 z-40 pointer-events-auto">
+    <div className={`sm:hidden fixed bottom-3 inset-x-3 z-40 pointer-events-auto transition-opacity duration-300 ${
+      isRevealed ? 'animate-site-bottomnav' : 'opacity-0 pointer-events-none'
+    }`}>
       <nav
         aria-label="Mobile Quick Bar"
         className="flex items-center justify-between px-2.5 py-1.5 rounded-2xl bg-[#0a0a0e]/92 backdrop-blur-xl border border-white/12 shadow-[0_8px_32px_rgba(0,0,0,0.85),0_0_1px_rgba(255,255,255,0.2)]"
