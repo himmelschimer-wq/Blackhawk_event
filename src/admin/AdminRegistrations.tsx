@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { adminApi } from '../lib/adminApi';
-import { Search, Filter, Check, X, Trash2, Eye, RefreshCw, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Filter, Check, X, Trash2, Eye, RefreshCw, AlertCircle, ChevronLeft, ChevronRight, Database } from 'lucide-react';
 import { sfx } from '../utils/sfx';
 
 interface Registration {
@@ -24,6 +24,7 @@ export const AdminRegistrations: React.FC = () => {
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [games, setGames] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Filters & Search
@@ -55,6 +56,20 @@ export const AdminRegistrations: React.FC = () => {
       setError(err.message || 'Failed to fetch registrations from database.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSyncDatabase = async () => {
+    try {
+      setSyncing(true);
+      sfx.playClick();
+      const res = await adminApi.syncDatabase();
+      showNotify(res.message || 'Supabase registrations and players synchronized successfully.');
+      await fetchRegistrations();
+    } catch (err: any) {
+      alert(err.message || 'Database synchronization failed.');
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -144,6 +159,15 @@ export const AdminRegistrations: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2 font-tech text-xs">
+          <button
+            onClick={handleSyncDatabase}
+            disabled={syncing}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-red-950/40 border border-red-500/40 text-red-400 hover:text-white hover:bg-red-900/60 transition-colors disabled:opacity-50"
+            title="Sync Players and Registrations with Supabase Database"
+          >
+            <Database className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
+            <span>{syncing ? 'SYNCING...' : 'SYNC DB'}</span>
+          </button>
           <button
             onClick={() => fetchRegistrations()}
             className="p-2 rounded bg-black/60 border border-white/10 text-zinc-400 hover:text-white hover:border-white/30 transition-colors"

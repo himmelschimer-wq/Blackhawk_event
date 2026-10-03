@@ -111,12 +111,18 @@ export const UpcomingEventsAndLeaderboard: React.FC<UpcomingEventsAndLeaderboard
     );
   });
 
-  // Filter leaderboard based on selected game with re-ranked positions according to points
+  // Filter leaderboard based on selected game with re-ranked positions according to points (strictly deduplicated)
+  const seenTags = new Set<string>();
   const filteredLeaderboard = (
     !selectedGame || selectedGame === 'ALL'
       ? leaderboard
       : leaderboard.filter(p => (p.game || '').toLowerCase() === selectedGame.toLowerCase() || (p.game || '').toUpperCase() === 'ALL')
-  ).map((item, idx) => ({
+  ).filter(p => {
+    const tag = (p.gamerTag || p.playerName || '').trim().toLowerCase();
+    if (!tag || seenTags.has(tag)) return false;
+    seenTags.add(tag);
+    return true;
+  }).map((item, idx) => ({
     ...item,
     rank: idx + 1,
     crown: idx === 0

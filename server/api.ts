@@ -1,7 +1,7 @@
 import express, { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
-import { supabaseDb, initSupabaseDatabase } from './supabaseDb.js';
+import { supabaseDb, initSupabaseDatabase, syncPlayersAndRegistrations } from './supabaseDb.js';
 import { FREE_FIRE_PRIZE_CONFIG, calculateFreeFireEventPayouts } from './freeFirePrizeEngine.js';
 
 // Initialize Pure Supabase Database
@@ -653,7 +653,7 @@ apiRouter.get('/events/freefire/payouts', async (_req: Request, res: Response) =
   }
 });
 
-// ─── PLAYERS ROUTES (STORED IN FIREBASE) ───────────────────────────────────────
+// ─── PLAYERS ROUTES (STORED IN FIREBASE / SUPABASE) ──────────────────────────
 
 apiRouter.get('/players', async (req: Request, res: Response) => {
   try {
@@ -662,6 +662,22 @@ apiRouter.get('/players', async (req: Request, res: Response) => {
     const status = req.query.status as string | undefined;
 
     let players = await supabaseDb.list<any>('players');
+
+    // Strict deduplication by normalized gamer tag
+    const uniquePlayersMap = new Map<string, any>();
+    for (const p of players) {
+      const tag = (p.gamerTag || p.gamer_tag || '').trim().toLowerCase();
+      if (!tag) continue;
+      if (!uniquePlayersMap.has(tag)) {
+        uniquePlayersMap.set(tag, p);
+      } else {
+        const existing = uniquePlayersMap.get(tag)!;
+        if ((!existing.discordUsername || existing.discordUsername === 'N/A') && p.discordUsername && p.discordUsername !== 'N/A') {
+          uniquePlayersMap.set(tag, { ...existing, ...p });
+        }
+      }
+    }
+    players = Array.from(uniquePlayersMap.values());
 
     if (search) {
       const s = search.toLowerCase();
@@ -691,38 +707,48 @@ apiRouter.post('/players', requireAdminAuth, async (req: Request, res: Response)
       return res.status(400).json({ error: 'Full name and gamer tag are required.' });
     }
 
-    const id = 'ply-' + Date.now().toString(36) + Math.random().toString(36).substring(2, 5);
-    const player = {
-      id,
-      fullName,
-      gamerTag,
-      discordUsername: discordUsername || 'N/A',
-      game: game || 'ALL',
-      team: team || '',
-      status: status || 'ACTIVE',
-      createdAt: new Date().toISOString()
-    };
+    const cleanTag = String(gamerTag).trim();
+    const cleanName = String(fullName).trim();
+    const cleanDiscord = (discordUsername || 'N/A').trim();
 
-    const discordPfp = getDiscordAvatar(discordUsername, gamerTag);
-    const leaderboardEntry = {
-      id: 'lb-' + id,
-      playerId: id,
-      playerName: fullName,
-      gamerTag,
-      game: game || 'ALL',
-      avatar: discordPfp,
-      matches: 0,
-      wins: 0,
-      score: 0,
-      points: 0,
-      status: 'ACTIVE',
+    // Check if player with this gamer tag already exists
+    const allPlayers = await supabaseDb.list<any>('players');
+    let existingPlayer = allPlayers.find(p => (p.gamerTag || p.gamer_tag || '').trim().toLowerCase() === cleanTag.toLowerCase());
+
+    const playerId = existingPlayer ? existingPlayer.id : ('ply-' + Date.now().toString(36) + Math.random().toString(36).substring(2, 5));
+    const player = {
+      id: playerId,
+      fullName: cleanName,
+      gamerTag: cleanTag,
+      discordUsername: cleanDiscord,
+      game: game || (existingPlayer ? existingPlayer.game : 'ALL'),
+      team: team !== undefined ? team : (existingPlayer?.team || ''),
+      status: status || (existingPlayer?.status || 'ACTIVE'),
+      createdAt: existingPlayer?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
 
-    await supabaseDb.set(`blackhawk/players/${id}`, player);
-    await supabaseDb.set(`blackhawk/leaderboard/${id}`, leaderboardEntry);
+    const discordPfp = getDiscordAvatar(cleanDiscord, cleanTag);
+    const leaderboardEntry = {
+      id: 'lb-' + playerId,
+      playerId,
+      playerName: cleanName,
+      gamerTag: cleanTag,
+      discordUsername: cleanDiscord,
+      game: game || 'ALL',
+      avatar: discordPfp,
+      matches: existingPlayer ? (existingPlayer.matches || 0) : 0,
+      wins: existingPlayer ? (existingPlayer.wins || 0) : 0,
+      score: existingPlayer ? (existingPlayer.score || 0) : 0,
+      points: existingPlayer ? (existingPlayer.points || 0) : 0,
+      status: status || 'ACTIVE',
+      updatedAt: new Date().toISOString()
+    };
 
-    res.status(201).json(player);
+    await supabaseDb.set(`blackhawk/players/${playerId}`, player);
+    await supabaseDb.set(`blackhawk/leaderboard/${playerId}`, leaderboardEntry);
+
+    res.status(existingPlayer ? 200 : 201).json(player);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -775,7 +801,7 @@ apiRouter.delete('/players/:id', requireAdminAuth, async (req: Request, res: Res
   }
 });
 
-// ─── LEADERBOARD & AUTOMATIC RANKING (FROM FIREBASE) ──────────────────────────
+// ─── LEADERBOARD & AUTOMATIC RANKING (FROM FIREBASE / SUPABASE) ───────────────
 
 apiRouter.get('/leaderboard', async (req: Request, res: Response) => {
   try {
@@ -786,7 +812,7 @@ apiRouter.get('/leaderboard', async (req: Request, res: Response) => {
       supabaseDb.list<any>('registrations')
     ]);
 
-    // Map existing leaderboard entries by unique player+game identifier or gamerTag
+    // Map strictly keyed by unique canonical player gamerTag: cleanTag
     const map = new Map<string, any>();
 
     // 1. Add existing explicit leaderboard entries
@@ -794,22 +820,39 @@ apiRouter.get('/leaderboard', async (req: Request, res: Response) => {
       if (lb.status && lb.status !== 'ACTIVE') continue;
       const cleanTag = (lb.gamerTag || lb.gamer_tag || '').trim().toLowerCase();
       if (!cleanTag) continue;
+
+      const existing = map.get(cleanTag);
+      const points = Number(lb.points) || 0;
+      const wins = Number(lb.wins) || 0;
+      const matches = Number(lb.matches) || 0;
+      const score = Number(lb.score) || 0;
       const lbGame = lb.game || 'ALL';
-      const key = `${cleanTag}_${lbGame.toLowerCase()}`;
-      map.set(key, {
-        id: lb.id || `lb_${cleanTag}`,
-        playerId: lb.playerId || lb.player_id || `ply_${cleanTag}`,
-        playerName: lb.playerName || lb.player_name || lb.gamerTag || lb.gamer_tag,
-        gamerTag: lb.gamerTag || lb.gamer_tag,
-        discordUsername: lb.discordUsername || lb.discord_username || 'N/A',
-        game: lbGame,
-        avatar: lb.avatar || getDiscordAvatar(lb.discordUsername || lb.discord_username, lb.gamerTag || lb.gamer_tag),
-        points: Number(lb.points) || 0,
-        wins: Number(lb.wins) || 0,
-        matches: Number(lb.matches) || 0,
-        score: Number(lb.score) || 0,
-        status: lb.status || 'ACTIVE'
-      });
+      const avatar = lb.avatar || getDiscordAvatar(lb.discordUsername || lb.discord_username, lb.gamerTag || lb.gamer_tag);
+
+      if (!existing) {
+        map.set(cleanTag, {
+          id: lb.id || `lb_${cleanTag}`,
+          playerId: lb.playerId || lb.player_id || `ply_${cleanTag}`,
+          playerName: lb.playerName || lb.player_name || lb.gamerTag || lb.gamer_tag,
+          gamerTag: lb.gamerTag || lb.gamer_tag,
+          discordUsername: lb.discordUsername || lb.discord_username || 'N/A',
+          game: lbGame,
+          gamesSet: new Set([lbGame.toUpperCase()]),
+          avatar,
+          points,
+          wins,
+          matches,
+          score,
+          status: lb.status || 'ACTIVE'
+        });
+      } else {
+        existing.points = Math.max(existing.points, points);
+        existing.wins = Math.max(existing.wins, wins);
+        existing.matches = Math.max(existing.matches, matches);
+        existing.score = Math.max(existing.score, score);
+        if (lbGame) existing.gamesSet.add(lbGame.toUpperCase());
+        if (!existing.avatar || existing.avatar.includes('images.unsplash.com')) existing.avatar = avatar;
+      }
     }
 
     // 2. Merge registered players from players table
@@ -818,23 +861,33 @@ apiRouter.get('/leaderboard', async (req: Request, res: Response) => {
       const cleanTag = (p.gamerTag || p.gamer_tag || '').trim().toLowerCase();
       if (!cleanTag) continue;
       const pGame = p.game || 'ALL';
-      const key = `${cleanTag}_${pGame.toLowerCase()}`;
-      
-      if (!map.has(key)) {
-        map.set(key, {
+      const pAvatar = p.avatar || getDiscordAvatar(p.discordUsername || p.discord_username, p.gamerTag || p.gamer_tag);
+
+      if (!map.has(cleanTag)) {
+        map.set(cleanTag, {
           id: 'lb-' + p.id,
           playerId: p.id,
           playerName: p.fullName || p.full_name || p.gamerTag || p.gamer_tag,
           gamerTag: p.gamerTag || p.gamer_tag,
           discordUsername: p.discordUsername || p.discord_username || 'N/A',
           game: pGame,
-          avatar: p.avatar || getDiscordAvatar(p.discordUsername || p.discord_username, p.gamerTag || p.gamer_tag),
+          gamesSet: new Set([pGame.toUpperCase()]),
+          avatar: pAvatar,
           points: Number(p.points) || 0,
           wins: Number(p.wins) || 0,
           matches: Number(p.matches) || 0,
           score: Number(p.score) || 0,
           status: 'ACTIVE'
         });
+      } else {
+        const existing = map.get(cleanTag)!;
+        existing.gamesSet.add(pGame.toUpperCase());
+        if (p.id && (!existing.playerId || existing.playerId.startsWith('ply_'))) {
+          existing.playerId = p.id;
+        }
+        if (p.fullName && (!existing.playerName || existing.playerName === existing.gamerTag)) {
+          existing.playerName = p.fullName;
+        }
       }
     }
 
@@ -843,17 +896,17 @@ apiRouter.get('/leaderboard', async (req: Request, res: Response) => {
       if (reg.status && reg.status === 'REJECTED') continue;
       const cleanTag = (reg.gamerTag || reg.gamer_tag || '').trim().toLowerCase();
       if (!cleanTag) continue;
-      const regGame = reg.gameName || reg.gameId || 'ALL';
-      const key = `${cleanTag}_${regGame.toLowerCase()}`;
+      const regGame = (reg.gameName || reg.gameId || 'ALL').toUpperCase();
 
-      if (!map.has(key)) {
-        map.set(key, {
+      if (!map.has(cleanTag)) {
+        map.set(cleanTag, {
           id: 'lb-' + reg.id,
           playerId: reg.playerId || reg.player_id || `ply_${reg.id}`,
           playerName: reg.playerName || reg.player_name || reg.gamerTag || reg.gamer_tag,
           gamerTag: reg.gamerTag || reg.gamer_tag,
           discordUsername: reg.discordUsername || reg.discord_username || 'N/A',
           game: regGame,
+          gamesSet: new Set([regGame]),
           avatar: getDiscordAvatar(reg.discordUsername || reg.discord_username, reg.gamerTag || reg.gamer_tag),
           points: 0,
           wins: 0,
@@ -861,19 +914,33 @@ apiRouter.get('/leaderboard', async (req: Request, res: Response) => {
           score: 0,
           status: 'ACTIVE'
         });
+      } else {
+        const existing = map.get(cleanTag)!;
+        existing.gamesSet.add(regGame);
       }
     }
 
     let entries = Array.from(map.values());
 
-    // Filter by game discipline if requested
+    // Filter by game discipline if requested (EXACTLY ONE ENTRY PER PLAYER ALWAYS)
     if (game && game !== 'ALL') {
-      const gLower = game.toLowerCase();
-      entries = entries.filter(l => (l.game || '').toLowerCase() === gLower || (l.game || '').toLowerCase() === 'all');
+      const gUpper = game.toUpperCase();
+      entries = entries.filter(l => 
+        l.gamesSet.has(gUpper) || 
+        l.gamesSet.has('ALL') || 
+        (l.game || '').toUpperCase() === gUpper || 
+        (l.game || '').toUpperCase() === 'ALL'
+      );
     }
 
+    // Format final entries: clean up gamesSet before JSON response
+    const formattedEntries = entries.map(e => {
+      const { gamesSet, ...rest } = e;
+      return rest;
+    });
+
     // Dynamic Deterministic Rank Sort: points DESC -> wins DESC -> score DESC -> matches ASC -> gamerTag ASC
-    entries.sort((a, b) => {
+    formattedEntries.sort((a, b) => {
       if ((b.points || 0) !== (a.points || 0)) return (b.points || 0) - (a.points || 0);
       if ((b.wins || 0) !== (a.wins || 0)) return (b.wins || 0) - (a.wins || 0);
       if ((b.score || 0) !== (a.score || 0)) return (b.score || 0) - (a.score || 0);
@@ -881,7 +948,7 @@ apiRouter.get('/leaderboard', async (req: Request, res: Response) => {
       return (a.gamerTag || '').localeCompare(b.gamerTag || '');
     });
 
-    const ranked = entries.map((r, index) => {
+    const ranked = formattedEntries.map((r, index) => {
       let avatar = r.avatar;
       if (!avatar || avatar.includes('images.unsplash.com') || avatar.trim() === '') {
         avatar = getDiscordAvatar(r.discordUsername, r.gamerTag);
@@ -910,36 +977,46 @@ apiRouter.post('/leaderboard', requireAdminAuth, async (req: Request, res: Respo
       return res.status(400).json({ error: 'Player Name and Gamer Tag are required.' });
     }
 
-    const playerId = req.body.playerId || 'ply-' + Date.now().toString(36) + Math.random().toString(36).substring(2, 5);
-    const lbId = 'lb-' + Date.now().toString(36) + Math.random().toString(36).substring(2, 5);
-    const pfp = avatar || getDiscordAvatar(req.body.discordUsername || 'N/A', gamerTag);
+    const cleanTag = String(gamerTag).trim();
+    const cleanName = String(playerName).trim();
+
+    const [allLb, allPlayers] = await Promise.all([
+      supabaseDb.list<any>('leaderboard'),
+      supabaseDb.list<any>('players')
+    ]);
+
+    let existingLb = allLb.find(l => (l.gamerTag || l.gamer_tag || '').trim().toLowerCase() === cleanTag.toLowerCase());
+    let existingPlayer = allPlayers.find(p => (p.gamerTag || p.gamer_tag || '').trim().toLowerCase() === cleanTag.toLowerCase());
+
+    const playerId = req.body.playerId || existingPlayer?.id || existingLb?.playerId || ('ply-' + Date.now().toString(36) + Math.random().toString(36).substring(2, 5));
+    const lbId = existingLb ? existingLb.id : ('lb-' + playerId);
+    const pfp = avatar || getDiscordAvatar(req.body.discordUsername || existingPlayer?.discordUsername || 'N/A', cleanTag);
 
     const entry = {
       id: lbId,
       playerId,
-      playerName,
-      gamerTag,
-      discordUsername: req.body.discordUsername || 'N/A',
-      game: game || 'ALL',
+      playerName: cleanName,
+      gamerTag: cleanTag,
+      discordUsername: req.body.discordUsername || existingPlayer?.discordUsername || 'N/A',
+      game: game || existingLb?.game || 'ALL',
       points: Number(points) || 0,
       wins: Number(wins) || 0,
       matches: Number(matches) || 0,
       score: Number(score) || 0,
       avatar: pfp,
       status: status || 'ACTIVE',
-      createdAt: new Date().toISOString(),
+      createdAt: existingLb?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
 
-    await supabaseDb.set(`blackhawk/leaderboard/${playerId}`, entry);
+    await supabaseDb.set(`blackhawk/leaderboard/${lbId}`, entry);
 
     // Also ensure player row exists in players table
-    const existingPlayer = await supabaseDb.get<any>(`blackhawk/players/${playerId}`);
     if (!existingPlayer) {
       await supabaseDb.set(`blackhawk/players/${playerId}`, {
         id: playerId,
-        fullName: playerName,
-        gamerTag,
+        fullName: cleanName,
+        gamerTag: cleanTag,
         discordUsername: req.body.discordUsername || 'N/A',
         game: game || 'ALL',
         status: 'ACTIVE',
@@ -947,7 +1024,7 @@ apiRouter.post('/leaderboard', requireAdminAuth, async (req: Request, res: Respo
       });
     }
 
-    res.status(201).json(entry);
+    res.status(existingLb ? 200 : 201).json(entry);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -964,7 +1041,7 @@ apiRouter.patch('/leaderboard/:id', requireAdminAuth, async (req: Request, res: 
       const found = all.find(l => l.id === id || l.playerId === id);
       if (found) {
         existing = found;
-        key = found.playerId || found.id;
+        key = found.id || found.playerId;
       }
     }
 
@@ -1047,16 +1124,15 @@ apiRouter.post('/leaderboard/record-match', requireAdminAuth, async (req: Reques
     const matchKills = Number(kills) || 0;
     const winIncrement = isWin || Number(placement) === 1 ? 1 : 0;
 
-    // Search existing leaderboard entry by gamerTag, playerId, or playerName in this game
+    // Search existing leaderboard entry by gamerTag, playerId, or playerName
     const allLeaderboard = await supabaseDb.list<any>('leaderboard');
     let entry = allLeaderboard.find(l => 
-      ((playerId && l.playerId === playerId) ||
-       (l.gamerTag && l.gamerTag.toLowerCase() === cleanGamerTag.toLowerCase()) ||
-       (l.playerName && l.playerName.toLowerCase() === cleanPlayerName.toLowerCase())) &&
-      (!l.game || l.game.toUpperCase() === targetGame)
+      ((playerId && (l.playerId === playerId || l.id === playerId)) ||
+       ((l.gamerTag || l.gamer_tag) && (l.gamerTag || l.gamer_tag).trim().toLowerCase() === cleanGamerTag.trim().toLowerCase()) ||
+       ((l.playerName || l.player_name) && (l.playerName || l.player_name).trim().toLowerCase() === cleanPlayerName.trim().toLowerCase()))
     );
 
-    let key = entry ? (entry.id || entry.playerId || cleanGamerTag.toLowerCase().replace(/[^a-z0-9]/g, '_')) : crypto.randomUUID();
+    let key = entry ? (entry.id || entry.playerId) : ('lb-' + (playerId || cleanGamerTag.toLowerCase().replace(/[^a-z0-9]/g, '_')));
 
     let updatedEntry: any;
     if (entry) {
@@ -1076,7 +1152,7 @@ apiRouter.post('/leaderboard/record-match', requireAdminAuth, async (req: Reques
         playerName: cleanPlayerName,
         gamerTag: cleanGamerTag,
         game: targetGame,
-        avatar: '',
+        avatar: getDiscordAvatar('', cleanGamerTag),
         points: matchPoints,
         wins: winIncrement,
         matches: 1,
@@ -1123,7 +1199,7 @@ apiRouter.post('/leaderboard/record-match', requireAdminAuth, async (req: Reques
 });
 
 
-// ─── REGISTRATIONS ROUTES (STORED IN FIREBASE) ────────────────────────────────
+// ─── REGISTRATIONS ROUTES (STORED IN FIREBASE / SUPABASE) ─────────────────────
 
 apiRouter.get('/registrations', requireAdminAuth, async (req: Request, res: Response) => {
   try {
@@ -1150,9 +1226,29 @@ apiRouter.get('/registrations', requireAdminAuth, async (req: Request, res: Resp
       );
     }
 
+    // Deduplicate strictly: exactly ONE registration per player per game
+    const uniqueMap = new Map<string, any>();
+    for (const r of list) {
+      const tag = (r.gamerTag || r.gamer_tag || '').trim().toLowerCase();
+      const gId = (r.gameId || r.game_id || 'freefire').toLowerCase();
+      const key = `${tag}_${gId}`;
+      if (!uniqueMap.has(key)) {
+        uniqueMap.set(key, r);
+      } else {
+        const existing = uniqueMap.get(key)!;
+        const rHasEvent = Boolean((r.eventId || r.event_id) && (r.eventId || r.event_id) !== 'null');
+        const exHasEvent = Boolean((existing.eventId || existing.event_id) && (existing.eventId || existing.event_id) !== 'null');
+        if (rHasEvent && !exHasEvent) {
+          uniqueMap.set(key, r);
+        }
+      }
+    }
+
+    const dedupedList = Array.from(uniqueMap.values());
+
     // Sort newest first
-    list.sort((a, b) => new Date(b.registeredAt || 0).getTime() - new Date(a.registeredAt || 0).getTime());
-    res.json(list);
+    dedupedList.sort((a, b) => new Date(b.registeredAt || b.registered_at || 0).getTime() - new Date(a.registeredAt || a.registered_at || 0).getTime());
+    res.json(dedupedList);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -1175,15 +1271,15 @@ apiRouter.post('/registrations', async (req: Request, res: Response) => {
 
     if (cleanTag.length < 2) return res.status(400).json({ error: 'Username / Gamer tag must be at least 2 characters.' });
 
-    // Check duplicate registrations in Firebase
+    // Check duplicate registrations in database
     const existingRegistrations = await supabaseDb.list<any>('registrations');
     const duplicateGames: string[] = [];
 
     for (const g of games) {
-      const gameId = g.gameId || 'bgmi';
+      const gameId = (g.gameId || 'freefire').toLowerCase();
       const isDup = existingRegistrations.some(r =>
-        r.gamerTag?.toLowerCase() === cleanTag.toLowerCase() &&
-        r.gameId?.toLowerCase() === gameId.toLowerCase() &&
+        (r.gamerTag || r.gamer_tag)?.trim().toLowerCase() === cleanTag.toLowerCase() &&
+        (r.gameId || r.game_id)?.trim().toLowerCase() === gameId &&
         r.status !== 'REJECTED'
       );
       if (isDup) {
@@ -1198,9 +1294,9 @@ apiRouter.post('/registrations', async (req: Request, res: Response) => {
       });
     }
 
-    // 1. Find or create Player in Firebase
+    // 1. Find or create Player in database (Strictly deduplicated by gamer tag)
     const allPlayers = await supabaseDb.list<any>('players');
-    let player = allPlayers.find(p => p.gamerTag?.toLowerCase() === cleanTag.toLowerCase());
+    let player = allPlayers.find(p => (p.gamerTag || p.gamer_tag || '').trim().toLowerCase() === cleanTag.toLowerCase());
 
     if (!player) {
       const playerId = 'ply-' + Date.now().toString(36) + Math.random().toString(36).substring(2, 5);
@@ -1211,8 +1307,9 @@ apiRouter.post('/registrations', async (req: Request, res: Response) => {
         discordUsername: cleanDiscord,
         email: cleanEmail,
         phone: cleanPhone,
-        game: games[0].gameName || 'ALL',
+        game: games[0].gameName || 'FREE FIRE',
         status: 'ACTIVE',
+        joinedAt: new Date().toISOString(),
         createdAt: new Date().toISOString()
       };
 
@@ -1222,21 +1319,55 @@ apiRouter.post('/registrations', async (req: Request, res: Response) => {
         playerId,
         playerName: cleanName,
         gamerTag: cleanTag,
-        game: games[0].gameName || 'ALL',
+        discordUsername: cleanDiscord,
+        game: games[0].gameName || 'FREE FIRE',
         avatar: discordPfp,
         matches: 0,
         wins: 0,
         score: 0,
         points: 0,
         status: 'ACTIVE',
+        createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
 
       await supabaseDb.set(`blackhawk/players/${playerId}`, player);
       await supabaseDb.set(`blackhawk/leaderboard/${playerId}`, leaderboardEntry);
+    } else {
+      const updatedPlayer = {
+        ...player,
+        fullName: cleanName || player.fullName,
+        discordUsername: cleanDiscord !== 'N/A' ? cleanDiscord : player.discordUsername,
+        email: cleanEmail || player.email,
+        phone: cleanPhone || player.phone
+      };
+      await supabaseDb.set(`blackhawk/players/${player.id}`, updatedPlayer);
+      player = updatedPlayer;
+
+      // Ensure leaderboard entry exists for existing player
+      const existingLb = await supabaseDb.get<any>(`blackhawk/leaderboard/${player.id}`);
+      if (!existingLb) {
+        const discordPfp = getDiscordAvatar(player.discordUsername, player.gamerTag);
+        await supabaseDb.set(`blackhawk/leaderboard/${player.id}`, {
+          id: 'lb-' + player.id,
+          playerId: player.id,
+          playerName: player.fullName || player.gamerTag,
+          gamerTag: player.gamerTag,
+          discordUsername: player.discordUsername || 'N/A',
+          game: player.game || 'FREE FIRE',
+          avatar: discordPfp,
+          matches: 0,
+          wins: 0,
+          score: 0,
+          points: 0,
+          status: 'ACTIVE',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        });
+      }
     }
 
-    // 2. Create Registrations directly in Firebase
+    // 2. Create Registrations
     const createdRegistrations: any[] = [];
     for (const g of games) {
       const regId = 'BHL-' + Math.floor(100000 + Math.random() * 900000);
@@ -1246,13 +1377,16 @@ apiRouter.post('/registrations', async (req: Request, res: Response) => {
         playerName: cleanName,
         gamerTag: cleanTag,
         discordUsername: cleanDiscord,
-        gameId: g.gameId || 'bgmi',
-        gameName: sanitize(g.gameName || 'BGMI', 60),
+        email: cleanEmail,
+        phone: cleanPhone,
+        gameId: (g.gameId || 'freefire').toLowerCase(),
+        gameName: sanitize(g.gameName || 'FREE FIRE', 60),
         eventId: g.eventId || null,
         eventTitle: g.eventTitle || null,
-        teamName: sanitize(g.teamName || '', 80) || null,
-        teamMembers: sanitize(g.teamMembers || '', 500) || null,
-        gameSpecificData: g.gameSpecificDetails || {},
+        playType: g.playType === 'Team / Squad' || g.play_type === 'Team / Squad' ? 'Team / Squad' : 'Solo',
+        teamName: sanitize(g.teamName || g.team_name || '', 80) || null,
+        teamMembers: sanitize(g.teamMembers || g.team_members || '', 500) || null,
+        gameSpecificData: g.gameSpecificDetails || g.gameSpecificData || {},
         status: 'REGISTERED',
         registeredAt: new Date().toISOString()
       };
@@ -1284,6 +1418,36 @@ apiRouter.patch('/registrations/:id', requireAdminAuth, async (req: Request, res
 
     await supabaseDb.set(`blackhawk/registrations/${id}`, updated);
     res.json(updated);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+apiRouter.delete('/registrations/:id', requireAdminAuth, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    await supabaseDb.delete(`blackhawk/registrations/${id}`);
+    res.json({ success: true, message: `Registration ${id} deleted.` });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── DATABASE SYNC ROUTE ───────────────────────────────────────────────────────
+
+apiRouter.post('/database/sync', requireAdminAuth, async (_req: Request, res: Response) => {
+  try {
+    const result = await syncPlayersAndRegistrations();
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+apiRouter.post('/registrations/sync', requireAdminAuth, async (_req: Request, res: Response) => {
+  try {
+    const result = await syncPlayersAndRegistrations();
+    res.json(result);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

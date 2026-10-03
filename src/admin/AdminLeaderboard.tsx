@@ -202,9 +202,14 @@ export const AdminLeaderboard: React.FC = () => {
     }
   };
 
-  // Filter and deterministic sort
+  // Filter and deterministic sort (strictly deduplicated)
+  const seenGamerTags = new Set<string>();
   const filtered = entries
     .filter((entry) => {
+      const tag = (entry.gamerTag || entry.playerName || '').trim().toLowerCase();
+      if (!tag || seenGamerTags.has(tag)) return false;
+      seenGamerTags.add(tag);
+
       const matchSearch =
         entry.playerName.toLowerCase().includes(search.toLowerCase()) ||
         entry.gamerTag.toLowerCase().includes(search.toLowerCase());

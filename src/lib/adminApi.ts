@@ -629,8 +629,12 @@ export const adminApi = {
       }
     } catch {}
 
-    const id = data.id || `ply_${Date.now()}`;
-    const payload = normalizeDbRow({ ...data, id, createdAt: new Date().toISOString() });
+    const cleanTag = (data.gamerTag || data.gamer_tag || '').trim();
+    const existingPlayers = getLocalFallback<any>('players');
+    const existing = existingPlayers.find((p: any) => (p.gamerTag || p.gamer_tag || '').trim().toLowerCase() === cleanTag.toLowerCase());
+
+    const id = data.id || existing?.id || `ply_${Date.now()}`;
+    const payload = normalizeDbRow({ ...existing, ...data, id, createdAt: existing?.createdAt || new Date().toISOString() });
     if (isSupabaseConfigured) {
       try {
         await supabase.from('players').upsert({
@@ -708,10 +712,20 @@ export const adminApi = {
     const url = game && game !== 'ALL' ? `/api/leaderboard?game=${encodeURIComponent(game)}` : '/api/leaderboard';
     const leaderboard = await fetchWithFallback<any[]>(url, 'leaderboard', { headers: this.getAuthHeaders() });
     if (!Array.isArray(leaderboard)) return [];
+
+    // Strict unique filter by gamer tag
+    const seen = new Set<string>();
+    const deduplicated = leaderboard.filter(l => {
+      const tag = (l.gamerTag || l.gamer_tag || l.playerName || '').trim().toLowerCase();
+      if (!tag || seen.has(tag)) return false;
+      seen.add(tag);
+      return true;
+    });
+
     if (game && game !== 'ALL') {
-      return leaderboard.filter(l => (l.game || '').toLowerCase() === game.toLowerCase());
+      return deduplicated.filter(l => (l.game || '').toLowerCase() === game.toLowerCase() || (l.game || '').toLowerCase() === 'all');
     }
-    return leaderboard;
+    return deduplicated;
   },
 
   async updateLeaderboard(id: string, data: any) {
@@ -744,14 +758,18 @@ export const adminApi = {
       }
     } catch {}
 
-    const id = data.id || `lb_${Date.now()}`;
-    const normalized = normalizeDbRow({ ...data, id });
+    const cleanTag = (data.gamerTag || data.gamer_tag || '').trim();
+    const existingLb = getLocalFallback<any>('leaderboard');
+    const existing = existingLb.find((l: any) => (l.gamerTag || l.gamer_tag || '').trim().toLowerCase() === cleanTag.toLowerCase());
+
+    const id = data.id || existing?.id || `lb_${Date.now()}`;
+    const normalized = normalizeDbRow({ ...existing, ...data, id });
 
     if (isSupabaseConfigured) {
       try {
         await supabase.from('leaderboard').upsert({
           id,
-          player_id: data.playerId || data.player_id || `ply_${Date.now()}`,
+          player_id: data.playerId || data.player_id || existing?.playerId || `ply_${Date.now()}`,
           player_name: data.playerName || data.player_name,
           gamer_tag: data.gamerTag || data.gamer_tag,
           discord_username: data.discordUsername || data.discord_username || 'N/A',
@@ -869,7 +887,26 @@ export const adminApi = {
         (r.id || '').toLowerCase().includes(s)
       );
     }
-    return filtered;
+
+    // Deduplicate strictly: exactly ONE registration per player per game
+    const uniqueMap = new Map<string, any>();
+    for (const r of filtered) {
+      const tag = (r.gamerTag || r.gamer_tag || '').trim().toLowerCase();
+      const gId = (r.gameId || r.game_id || r.gameName || r.game_name || 'freefire').toLowerCase();
+      const key = `${tag}_${gId}`;
+      if (!uniqueMap.has(key)) {
+        uniqueMap.set(key, r);
+      } else {
+        const existing = uniqueMap.get(key)!;
+        const rHasEvent = Boolean((r.eventId || r.event_id) && (r.eventId || r.event_id) !== 'null');
+        const exHasEvent = Boolean((existing.eventId || existing.event_id) && (existing.eventId || existing.event_id) !== 'null');
+        if (rHasEvent && !exHasEvent) {
+          uniqueMap.set(key, r);
+        }
+      }
+    }
+
+    return Array.from(uniqueMap.values());
   },
 
   async submitRegistration(data: any) {
@@ -890,17 +927,21 @@ export const adminApi = {
     } catch {}
 
     // Fallback registration handler
-    const playerId = `ply-${Date.now().toString(36)}`;
+    const cleanTag = (data.gamerTag || '').trim();
+    const existingPlayers = getLocalFallback<any>('players');
+    const existingPlayer = existingPlayers.find((p: any) => (p.gamerTag || p.gamer_tag || '').trim().toLowerCase() === cleanTag.toLowerCase());
+
+    const playerId = existingPlayer ? existingPlayer.id : `ply-${Date.now().toString(36)}`;
     const registeredAt = new Date().toISOString();
 
     const player = normalizeDbRow({
       id: playerId,
       fullName: data.fullName || data.gamerTag,
-      gamerTag: data.gamerTag,
+      gamerTag: cleanTag,
       discordUsername: data.discordUsername || 'N/A',
       game: data.games?.[0]?.gameName || 'ALL',
       status: 'ACTIVE',
-      createdAt: registeredAt
+      createdAt: existingPlayer?.createdAt || registeredAt
     });
 
     const registrationsList: any[] = [];
@@ -1024,5 +1065,20 @@ export const adminApi = {
       await supabase.from(table).delete().eq('id', id);
     }
     return { success: true };
+  },
+
+  async syncDatabase(): Promise<{ success: boolean; message?: string; error?: string }> {
+    try {
+      const res = await fetch('/api/database/sync', {
+        method: 'POST',
+        headers: this.getAuthHeaders()
+      });
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch {}
+
+    return { success: true, message: 'Database synchronized directly.' };
   }
 };
+

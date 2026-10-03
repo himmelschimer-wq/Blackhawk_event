@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { adminApi } from '../lib/adminApi';
-import { Search, Filter, Plus, Edit2, Trash2, Eye, X, Check, AlertCircle, RefreshCw } from 'lucide-react';
+import { Search, Filter, Plus, Edit2, Trash2, Eye, X, Check, AlertCircle, RefreshCw, Database } from 'lucide-react';
 import { sfx } from '../utils/sfx';
 
 interface Player {
@@ -18,6 +18,7 @@ export const AdminPlayers: React.FC = () => {
   const [players, setPlayers] = useState<Player[]>([]);
   const [games, setGames] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Filters & Search
@@ -57,6 +58,20 @@ export const AdminPlayers: React.FC = () => {
       setError(err.message || 'Failed to load players from database.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSyncDatabase = async () => {
+    try {
+      setSyncing(true);
+      sfx.playClick();
+      const res = await adminApi.syncDatabase();
+      showNotify(res.message || 'Supabase registrations and players synchronized successfully.');
+      await fetchPlayers();
+    } catch (err: any) {
+      alert(err.message || 'Database synchronization failed.');
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -191,6 +206,15 @@ export const AdminPlayers: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-3">
+          <button
+            onClick={handleSyncDatabase}
+            disabled={syncing}
+            className="flex items-center gap-1.5 px-3 py-2 rounded bg-red-950/40 border border-red-500/40 text-red-400 hover:text-white hover:bg-red-900/60 transition-colors font-tech text-xs disabled:opacity-50"
+            title="Sync Players and Registrations with Supabase Database"
+          >
+            <Database className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
+            <span>{syncing ? 'SYNCING...' : 'SYNC DB'}</span>
+          </button>
           <button
             onClick={() => fetchPlayers()}
             className="p-2 rounded bg-black/60 border border-white/10 text-zinc-400 hover:text-white hover:border-white/30 transition-colors"

@@ -788,8 +788,13 @@ class TournamentStore {
         });
       }
 
-      // Upsert players
+      // Upsert unique players
+      const seenPlayers = new Set<string>();
       for (const p of this.players) {
+        const tag = (p.gamerTag || '').trim().toLowerCase();
+        if (!tag || seenPlayers.has(tag)) continue;
+        seenPlayers.add(tag);
+
         await supabase.from('players').upsert({
           id: p.id,
           full_name: p.fullName,
@@ -886,7 +891,6 @@ class TournamentStore {
       timestamp: new Date().toISOString()
     };
     this.auditLogs.unshift(log);
-    // keep maximum 200 logs
     if (this.auditLogs.length > 200) {
       this.auditLogs = this.auditLogs.slice(0, 200);
     }
@@ -910,25 +914,23 @@ class TournamentStore {
     teamMembers?: string;
     gameSpecificDetails: Record<string, string>;
   }): { registrationId: string; player: PlayerRecord } {
-    // 1. Find or create player
-    let player = this.players.find(p => p.gamerTag.toLowerCase() === data.gamerTag.toLowerCase());
+    const cleanTag = (data.gamerTag || '').trim();
+    let player = this.players.find(p => p.gamerTag.trim().toLowerCase() === cleanTag.toLowerCase());
     if (!player) {
       player = {
         id: `p-${Date.now()}`,
         fullName: data.fullName,
-        gamerTag: data.gamerTag,
+        gamerTag: cleanTag,
         discordUsername: data.discordUsername,
         status: 'ACTIVE',
         joinedAt: new Date().toISOString().split('T')[0]
       };
       this.players.push(player);
     } else {
-      // Update discord or full name if changed
       player.fullName = data.fullName;
       player.discordUsername = data.discordUsername;
     }
 
-    // 2. Generate Registration ID: BHL-XXXXXX
     const regNum = Math.floor(100000 + Math.random() * 900000);
     const regId = `BHL-${regNum}`;
 
@@ -953,7 +955,6 @@ class TournamentStore {
     this.logAudit('PLAYER_REGISTRATION', 'Registration', regId, 'None', `Registered for ${data.gameName}`);
     this.saveToStorage();
 
-    // Sync directly to Firebase Realtime Database
     this.writeToRtdb(`players/${player.id}`, player);
     this.writeToRtdb(`registrations/${regId}`, reg);
 
@@ -975,13 +976,13 @@ class TournamentStore {
       gameSpecificDetails: Record<string, string>;
     }>;
   }): { player: PlayerRecord; registrations: RegistrationRecord[] } {
-    // 1. Find or create athlete player record
-    let player = this.players.find(p => p.gamerTag.toLowerCase() === data.gamerTag.toLowerCase());
+    const cleanTag = (data.gamerTag || '').trim();
+    let player = this.players.find(p => p.gamerTag.trim().toLowerCase() === cleanTag.toLowerCase());
     if (!player) {
       player = {
         id: `p-${Date.now()}`,
         fullName: data.fullName,
-        gamerTag: data.gamerTag,
+        gamerTag: cleanTag,
         discordUsername: data.discordUsername,
         status: 'ACTIVE',
         joinedAt: new Date().toISOString().split('T')[0]
@@ -1042,7 +1043,13 @@ class TournamentStore {
   }
 
   getPlayers(): PlayerRecord[] {
-    return [...this.players];
+    const seen = new Set<string>();
+    return this.players.filter(p => {
+      const tag = (p.gamerTag || '').trim().toLowerCase();
+      if (!tag || seen.has(tag)) return false;
+      seen.add(tag);
+      return true;
+    });
   }
 
   getRegistrations(): RegistrationRecord[] {
@@ -1222,11 +1229,9 @@ class TournamentStore {
 
   // --- Participation Draw ---
   runParticipationDraw(eventId: string): DrawRecord | null {
-    // Eligible participants: all players registered/active in this event who haven't won a draw yet
     const eventRegs = this.registrations.filter(r => r.gameId === eventId || r.week === eventId);
     const existingWinnerIds = new Set(this.draws.map(d => d.winnerPlayerId));
 
-    // Fallback: use all active players if specific event regs are few
     let eligible = eventRegs.filter(r => !existingWinnerIds.has(r.playerId) && r.status === 'APPROVED');
     if (eligible.length === 0) {
       eligible = this.registrations.filter(r => !existingWinnerIds.has(r.playerId));
@@ -1294,7 +1299,7 @@ class TournamentStore {
   }
 
   // --- Automatic Leaderboard Generation ---
-  // Must be strictly derived from published results
+  // Must be strictly derived from published results and deduplicated per player
   getLeaderboard(): LeaderboardEntry[] {
     const publishedResults = this.results.filter(r => r.status === 'PUBLISHED');
     const playerMap = new Map<string, {
@@ -1305,20 +1310,31 @@ class TournamentStore {
       breakdown: LeaderboardEntry['breakdown'];
     }>();
 
-    // Initialize all active players so everyone appears or only participating players
+    // Initialize all active unique players keyed by gamerTag
     this.players.forEach(p => {
-      playerMap.set(p.id, {
-        player: p,
-        points: 0,
-        eventsCount: new Set(),
-        wins: 0,
-        breakdown: []
-      });
+      const tag = (p.gamerTag || '').trim().toLowerCase();
+      if (!tag) return;
+      if (!playerMap.has(tag)) {
+        playerMap.set(tag, {
+          player: p,
+          points: 0,
+          eventsCount: new Set(),
+          wins: 0,
+          breakdown: []
+        });
+      }
     });
 
     // Sum points from published results
     publishedResults.forEach(res => {
-      const entry = playerMap.get(res.playerId);
+      const tag = (res.gamerTag || '').trim().toLowerCase();
+      let entry = playerMap.get(tag);
+      if (!entry) {
+        // Fallback by playerId
+        const found = Array.from(playerMap.values()).find(e => e.player.id === res.playerId);
+        if (found) entry = found;
+      }
+
       if (entry) {
         entry.points += res.points.totalPoints;
         entry.eventsCount.add(res.eventId);
