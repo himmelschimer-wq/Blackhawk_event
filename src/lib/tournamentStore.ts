@@ -12,6 +12,10 @@ export interface PlayerRecord {
   fullName: string;
   gamerTag: string;
   discordUsername: string;
+  discordUserId?: string;
+  freeFireUid?: string;
+  inGameName?: string;
+  avatar?: string;
   status: 'ACTIVE' | 'DISQUALIFIED' | 'BENCHED';
   joinedAt: string;
 }
@@ -108,6 +112,16 @@ export interface LeaderboardEntry {
   playerName: string;
   gamerTag: string;
   discordUsername: string;
+  discordUserId?: string;
+  freeFireUid?: string;
+  inGameName?: string;
+  placementPoints?: number;
+  killPoints?: number;
+  participationPoints?: number;
+  challengeBonus?: number;
+  risingStarBonus?: number;
+  avatar?: string;
+  game?: string;
   totalPoints: number;
   eventsParticipated: number;
   winsCount: number;
@@ -423,6 +437,7 @@ class TournamentStore {
   private currentRole: UserRole | null = null;
   private currentAdminName: string = 'Blackhawk_Admin';
   private listeners: Array<() => void> = [];
+  private leaderboardAvatars: Map<string, string> = new Map();
 
   private isFirebaseInitialized: boolean = false;
 
@@ -574,14 +589,24 @@ class TournamentStore {
 
     try {
       // 1. Initial Data Fetch from Supabase
-      const [eventsRes, playersRes, regRes, resultsRes, drawsRes, logsRes] = await Promise.all([
+      const [eventsRes, playersRes, regRes, resultsRes, drawsRes, logsRes, lbRes] = await Promise.all([
         supabase.from('events').select('*').order('created_at', { ascending: true }),
         supabase.from('players').select('*').order('created_at', { ascending: false }),
         supabase.from('registrations').select('*').order('registered_at', { ascending: false }),
         supabase.from('match_results').select('*').order('recorded_at', { ascending: false }),
         supabase.from('draws').select('*').order('drawn_at', { ascending: false }),
         supabase.from('audit_logs').select('*').order('timestamp', { ascending: false }).limit(200),
+        supabase.from('leaderboard').select('*').order('rank', { ascending: true }),
       ]);
+
+      if (lbRes.data) {
+        lbRes.data.forEach((l: any) => {
+          const normTag = (l.gamer_tag || '').trim().toLowerCase();
+          if (normTag && l.avatar) {
+            this.leaderboardAvatars.set(normTag, l.avatar);
+          }
+        });
+      }
 
       if (eventsRes.data && eventsRes.data.length > 0) {
         this.events = eventsRes.data.map(e => ({
@@ -600,14 +625,18 @@ class TournamentStore {
       }
 
       if (playersRes.data && playersRes.data.length > 0) {
-        this.players = playersRes.data.map(p => ({
-          id: p.id,
-          fullName: p.full_name,
-          gamerTag: p.gamer_tag,
-          discordUsername: p.discord_username,
-          status: p.status || 'ACTIVE',
-          joinedAt: p.joined_at || p.created_at || ''
-        }));
+        this.players = playersRes.data.map(p => {
+          const normTag = (p.gamer_tag || '').trim().toLowerCase();
+          return {
+            id: p.id,
+            fullName: p.full_name,
+            gamerTag: p.gamer_tag,
+            discordUsername: p.discord_username,
+            avatar: this.leaderboardAvatars.get(normTag),
+            status: p.status || 'ACTIVE',
+            joinedAt: p.joined_at || p.created_at || ''
+          };
+        });
       }
 
       if (regRes.data && regRes.data.length > 0) {
@@ -1356,17 +1385,22 @@ class TournamentStore {
     // Convert map to sorted list
     const list: LeaderboardEntry[] = Array.from(playerMap.values())
       .filter(item => item.player.status !== 'DISQUALIFIED')
-      .map(item => ({
-        rank: 1,
-        playerId: item.player.id,
-        playerName: item.player.fullName,
-        gamerTag: item.player.gamerTag,
-        discordUsername: item.player.discordUsername,
-        totalPoints: item.points,
-        eventsParticipated: item.eventsCount.size,
-        winsCount: item.wins,
-        breakdown: item.breakdown
-      }))
+      .map(item => {
+        const normTag = (item.player.gamerTag || '').trim().toLowerCase();
+        return {
+          rank: 1,
+          playerId: item.player.id,
+          playerName: item.player.fullName,
+          gamerTag: item.player.gamerTag,
+          discordUsername: item.player.discordUsername,
+          avatar: item.player.avatar || this.leaderboardAvatars.get(normTag),
+          game: (item.player as any).game || 'ALL',
+          totalPoints: item.points,
+          eventsParticipated: item.eventsCount.size,
+          winsCount: item.wins,
+          breakdown: item.breakdown
+        };
+      })
       .sort((a, b) => {
         if (b.totalPoints !== a.totalPoints) {
           return b.totalPoints - a.totalPoints;

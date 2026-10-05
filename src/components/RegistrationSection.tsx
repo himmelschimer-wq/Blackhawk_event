@@ -375,6 +375,10 @@ export const RegistrationSection: React.FC<RegistrationProps> = ({
             gameSpecificDetails['In-Game Handle'] = gamerTag;
           }
 
+          if (/^\d{16,21}$/.test(discordUsername.trim())) {
+            gameSpecificDetails['Discord User ID'] = discordUsername.trim();
+          }
+
           entries.push({
             gameId,
             gameName,
@@ -426,6 +430,10 @@ export const RegistrationSection: React.FC<RegistrationProps> = ({
             }
           } else {
             gameSpecificDetails['In-Game Handle'] = gamerTag;
+          }
+
+          if (/^\d{16,21}$/.test(discordUsername.trim())) {
+            gameSpecificDetails['Discord User ID'] = discordUsername.trim();
           }
 
           entries.push({
@@ -777,19 +785,22 @@ export const RegistrationSection: React.FC<RegistrationProps> = ({
                 {/* Discord ID */}
                 <div>
                   <label className="block text-[11px] font-tech text-zinc-300 uppercase tracking-wider font-semibold mb-1">
-                    Discord ID / Tag <span className="text-[#ff2a2a]">*</span>
+                    Discord ID / Username <span className="text-[#ff2a2a]">*</span>
                   </label>
                   <div className="relative">
                     <AtSign className="w-3.5 h-3.5 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
                     <input
                       required
                       type="text"
-                      placeholder="e.g. shadowhawk or shadowhawk#0001"
+                      placeholder="e.g. shadowhawk or Discord User ID (e.g. 1357...)"
                       value={discordUsername}
                       onChange={e => setDiscordUsername(e.target.value)}
                       className="w-full pl-9 pr-3 py-2 bg-black/60 border border-white/10 rounded-lg font-tech text-base sm:text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-red-500 transition-colors"
                     />
                   </div>
+                  <span className="text-[10px] text-zinc-500 mt-1 block">
+                    Tip: Enter your Discord User ID (snowflake) to display your custom Discord avatar on the leaderboard.
+                  </span>
                 </div>
 
               </div>

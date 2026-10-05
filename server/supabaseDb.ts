@@ -492,15 +492,57 @@ export async function deduplicateDatabaseRecords() {
 }
 
 /**
- * Helper to generate Discord Avatar URL
+ * Helper to extract Discord User ID (snowflake)
  */
-function getDiscordAvatarUrl(discordUsername?: string, gamerTag?: string) {
-  const clean = (discordUsername || '').trim();
-  const seed = encodeURIComponent(clean || gamerTag || 'Player');
-  if (clean && !clean.includes(' ') && clean !== 'N/A') {
-    return `https://unavatar.io/discord/${seed}?fallback=https%3A%2F%2Fapi.dicebear.com%2F7.x%2Fbottts%2Fsvg%3Fseed%3D${seed}%26backgroundColor%3D09090b%2C18181b`;
+function extractDiscordUserId(details?: any, discordUsername?: string): string | null {
+  if (details && typeof details === 'object') {
+    for (const key of Object.keys(details)) {
+      if (/discord.*(user.*)?id/i.test(key)) {
+        const val = String(details[key]).trim();
+        if (/^\d{16,21}$/.test(val)) return val;
+      }
+    }
+    if (details.UID && /^\d{17,20}$/.test(String(details.UID).trim())) {
+      return String(details.UID).trim();
+    }
   }
-  return `https://api.dicebear.com/7.x/bottts/svg?seed=${seed}&backgroundColor=09090b,18181b`;
+  const cleanDiscord = (discordUsername || '').trim();
+  if (/^\d{16,21}$/.test(cleanDiscord)) {
+    return cleanDiscord;
+  }
+  return null;
+}
+
+/**
+ * Helper to generate Discord Avatar URL supporting Discord User IDs
+ */
+async function getDiscordAvatarUrl(discordUsername?: string, gamerTag?: string, userId?: string | null): Promise<string> {
+  const cleanId = (userId || '').trim();
+  const clean = (discordUsername || gamerTag || 'Player').trim().replace(/^@/, '');
+
+  if (/^\d{16,21}$/.test(cleanId)) {
+    try {
+      const res = await fetch(`https://japi.rest/discord/v1/user/${cleanId}`, {
+        signal: AbortSignal.timeout(3500)
+      });
+      if (res.ok) {
+        const json = (await res.json()) as any;
+        const data = json?.data;
+        if (data?.avatarURL) return data.avatarURL;
+        if (data?.defaultAvatarURL) return data.defaultAvatarURL;
+      }
+    } catch {}
+
+    try {
+      const idx = Number((BigInt(cleanId) >> 22n) % 6n);
+      return `https://cdn.discordapp.com/embed/avatars/${idx}.png`;
+    } catch {}
+  }
+
+  if (clean && !clean.includes(' ') && clean !== 'N/A') {
+    return `https://unavatar.io/discord/${encodeURIComponent(clean)}?fallback=https%3A%2F%2Fapi.dicebear.com%2F7.x%2Fbottts%2Fsvg%3Fseed%3D${encodeURIComponent(clean)}%26backgroundColor%3D09090b%2C18181b`;
+  }
+  return `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(gamerTag || 'Player')}&backgroundColor=09090b,18181b`;
 }
 
 /**
@@ -639,12 +681,23 @@ export async function syncPlayersAndRegistrations() {
       if (tag) lbMap.set(tag, l);
     }
 
+    // Map gamer tags to Discord User IDs from registrations
+    const regDiscordIdMap = new Map<string, string>();
+    for (const r of registrations) {
+      const tag = (r.gamerTag || r.gamer_tag || '').trim().toLowerCase();
+      const uid = extractDiscordUserId(r.gameSpecificDetails || r.game_specific_details, r.discordUsername || r.discord_username);
+      if (tag && uid && !regDiscordIdMap.has(tag)) {
+        regDiscordIdMap.set(tag, uid);
+      }
+    }
+
     for (const p of latestPlayers) {
       const normTag = (p.gamerTag || p.gamer_tag || '').trim().toLowerCase();
       if (!normTag) continue;
 
       const existingLb = lbMap.get(normTag);
-      const avatarUrl = getDiscordAvatarUrl(p.discordUsername || p.discord_username, p.gamerTag || p.gamer_tag);
+      const discordUserId = regDiscordIdMap.get(normTag) || extractDiscordUserId(null, p.discordUsername || p.discord_username);
+      const avatarUrl = await getDiscordAvatarUrl(p.discordUsername || p.discord_username, p.gamerTag || p.gamer_tag, discordUserId);
 
       if (!existingLb) {
         const lbId = `lb-${p.id}`;
@@ -671,6 +724,7 @@ export async function syncPlayersAndRegistrations() {
           playerName: p.fullName || p.full_name || p.gamerTag || p.gamer_tag,
           gamerTag: p.gamerTag || p.gamer_tag,
           discordUsername: p.discordUsername || p.discord_username || 'N/A',
+          avatar: avatarUrl || existingLb.avatar,
           updatedAt: new Date().toISOString()
         });
       }

@@ -50,6 +50,26 @@
   letter-spacing: 0.02em;
 }
 
+.font-tech {
+  font-family: 'JetBrains Mono', 'Fira Code', 'Roboto Mono', ui-monospace, monospace;
+}
+
+.text-glow-red {
+  text-shadow: 0 0 12px rgba(225, 6, 0, 0.7), 0 0 24px rgba(225, 6, 0, 0.4);
+}
+
+.text-glow-gold {
+  text-shadow: 0 0 12px rgba(245, 158, 11, 0.8), 0 0 25px rgba(217, 119, 6, 0.4);
+}
+
+.text-glow-silver {
+  text-shadow: 0 0 12px rgba(203, 213, 225, 0.8), 0 0 22px rgba(148, 163, 184, 0.4);
+}
+
+.text-glow-bronze {
+  text-shadow: 0 0 12px rgba(217, 119, 6, 0.7), 0 0 20px rgba(180, 83, 9, 0.35);
+}
+
 /* Floating Slow Physical Emblem Animation */
 @keyframes floatSlow {
   0%, 100% {

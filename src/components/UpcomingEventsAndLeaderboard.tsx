@@ -45,6 +45,16 @@ export interface DBLeaderboardItem {
   points: number;
   rank: number;
   crown: boolean;
+  discordUsername?: string;
+  discordUserId?: string;
+  freeFireUid?: string;
+  inGameName?: string;
+  placementPoints?: number;
+  killPoints?: number;
+  participationPoints?: number;
+  challengeBonus?: number;
+  risingStarBonus?: number;
+  totalPoints?: number;
 }
 
 export const UpcomingEventsAndLeaderboard: React.FC<UpcomingEventsAndLeaderboardProps> = ({
@@ -339,10 +349,10 @@ export const UpcomingEventsAndLeaderboard: React.FC<UpcomingEventsAndLeaderboard
               {/* Table Column Headers */}
               <div className="flex items-center justify-between py-2 text-[10px] font-semibold tracking-[0.18em] text-[#63636b] uppercase border-b border-white/[0.04]">
                 <div className="flex items-center gap-4">
-                  <span className="w-6 text-center">#</span>
-                  <span>PLAYER</span>
+                  <span className="w-7 text-center">RANK</span>
+                  <span>CONTENDER</span>
                 </div>
-                <span>POINTS</span>
+                <span>LEAGUE PTS</span>
               </div>
 
               {/* Empty State */}
@@ -355,7 +365,7 @@ export const UpcomingEventsAndLeaderboard: React.FC<UpcomingEventsAndLeaderboard
               )}
 
               {/* Player Rows with Automatic Ranking */}
-              <div className="divide-y divide-white/[0.04] max-h-[500px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-white/10">
+              <div className="divide-y divide-white/[0.04] max-h-[460px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-white/10">
                 {filteredLeaderboard.map((player) => (
                   <div
                     key={player.id}
@@ -373,25 +383,39 @@ export const UpcomingEventsAndLeaderboard: React.FC<UpcomingEventsAndLeaderboard
                         wins: player.wins,
                         matches: player.matches,
                         score: player.score,
+                        discordUsername: player.discordUsername,
+                        discordUserId: player.discordUserId,
+                        freeFireUid: player.freeFireUid,
+                        inGameName: player.inGameName,
+                        placementPoints: player.placementPoints,
+                        killPoints: player.killPoints,
+                        participationPoints: player.participationPoints,
+                        challengeBonus: player.challengeBonus,
+                        risingStarBonus: player.risingStarBonus,
+                        totalPoints: player.points,
                       });
                     }}
-                    className={`py-3 flex items-center justify-between transition-colors -mx-2 px-2 rounded-lg cursor-pointer group ${
+                    className={`py-2.5 flex items-center justify-between transition-colors -mx-2 px-2.5 rounded-lg cursor-pointer group ${
                       player.rank === 1
-                        ? 'bg-[#d49935]/[0.06] border border-[#d49935]/20 my-1 hover:bg-[#d49935]/[0.12]'
+                        ? 'bg-[#d49935]/[0.06] border border-[#d49935]/25 my-1 hover:bg-[#d49935]/[0.12]'
                         : 'hover:bg-white/[0.04]'
                     }`}
                   >
                     {/* Rank + Avatar + Name */}
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2.5 min-w-0">
                       {/* Rank Pill */}
                       <span
-                        className={`w-6 h-6 rounded flex items-center justify-center text-xs font-bold ${
+                        className={`w-7 h-7 rounded flex items-center justify-center text-xs font-bold shrink-0 ${
                           player.rank === 1
-                            ? 'bg-[#d49935]/30 text-[#f5c464] border border-[#d49935]/50'
-                            : 'text-[#82828a] group-hover:text-zinc-300'
+                            ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                            : player.rank === 2
+                            ? 'bg-slate-300/20 text-slate-200 border border-slate-300/40'
+                            : player.rank === 3
+                            ? 'bg-amber-700/20 text-amber-400 border border-amber-700/40'
+                            : 'bg-white/5 text-[#82828a] border border-white/5 group-hover:text-zinc-300 group-hover:border-white/15'
                         }`}
                       >
-                        #{player.rank}
+                        {player.rank === 1 ? '🥇' : player.rank === 2 ? '🥈' : player.rank === 3 ? '🥉' : `#${player.rank}`}
                       </span>
 
                       {/* Avatar from Discord / Gamer Profile */}
@@ -407,27 +431,32 @@ export const UpcomingEventsAndLeaderboard: React.FC<UpcomingEventsAndLeaderboard
                       </div>
 
                       {/* Player Name */}
-                      <div className="flex items-center gap-1.5">
-                        <span
-                          className={`text-xs font-semibold tracking-wide group-hover:text-white transition-colors ${
-                            player.rank === 1 ? 'text-[#f5c464]' : 'text-zinc-200'
-                          }`}
-                        >
-                          {player.gamerTag}
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className={`text-xs font-semibold tracking-wide group-hover:text-white transition-colors truncate block ${
+                              player.rank === 1 ? 'text-[#f5c464]' : 'text-zinc-200'
+                            }`}
+                          >
+                            {player.playerName || player.gamerTag}
+                          </span>
+                        </div>
+                        <span className="font-mono text-[10px] text-zinc-400 truncate block">
+                          @{player.gamerTag}
                         </span>
-                        {player.rank === 1 && <span className="text-xs">👑</span>}
                       </div>
                     </div>
 
                     {/* Points on the Right */}
-                    <div className="text-right">
+                    <div className="text-right shrink-0 pl-2">
                       <span
                         className={`font-bebas text-base tracking-wider ${
-                          player.rank === 1 ? 'text-[#f5c464]' : 'text-[#D71920]'
+                          player.rank === 1 ? 'text-[#f5c464]' : 'text-[#ff3333]'
                         }`}
                       >
                         {player.points.toLocaleString()}
                       </span>
+                      <span className="block text-[8px] font-tech text-zinc-500 uppercase">PTS</span>
                     </div>
                   </div>
                 ))}

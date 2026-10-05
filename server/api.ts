@@ -10,8 +10,130 @@ initSupabaseDatabase();
 export const apiRouter = express.Router();
 apiRouter.use(express.json());
 
-// ─── DISCORD AVATAR HELPER ──────────────────────────────────────────────────
-export function getDiscordAvatar(discordUsername?: string, gamerTag?: string): string {
+// ─── DISCORD AVATAR & USER ID HELPERS ───────────────────────────────────────
+const discordAvatarCache = new Map<string, string>();
+
+/**
+ * Extract Discord User ID (snowflake 17-21 digits) from registration details or username
+ */
+export function extractDiscordUserId(details?: any, discordUsername?: string): string | null {
+  if (details && typeof details === 'object') {
+    for (const key of Object.keys(details)) {
+      if (/discord.*(user.*)?id/i.test(key)) {
+        const val = String(details[key]).trim();
+        if (/^\d{16,21}$/.test(val)) return val;
+      }
+    }
+    if (details.UID && /^\d{17,20}$/.test(String(details.UID).trim())) {
+      return String(details.UID).trim();
+    }
+  }
+  const cleanDiscord = (discordUsername || '').trim();
+  if (/^\d{16,21}$/.test(cleanDiscord)) {
+    return cleanDiscord;
+  }
+  return null;
+}
+
+/**
+ * Extract Free Fire UID / Game UID from registration details
+ */
+export function extractGameUid(details?: any): string | null {
+  if (!details) return null;
+  const parsed = typeof details === 'string' ? (() => { try { return JSON.parse(details); } catch { return {}; } })() : details;
+  if (!parsed || typeof parsed !== 'object') return null;
+  for (const key of Object.keys(parsed)) {
+    if (/free\s*fire\s*uid/i.test(key) || /bgmi\s*id/i.test(key) || /game\s*uid/i.test(key) || /in[- ]*game\s*uid/i.test(key) || /character\s*id/i.test(key)) {
+      const val = String(parsed[key]).trim();
+      if (val) return val;
+    }
+  }
+  if (parsed.UID && /^\d{7,14}$/.test(String(parsed.UID).trim())) {
+    return String(parsed.UID).trim();
+  }
+  return null;
+}
+
+/**
+ * Extract In-Game Name from registration details
+ */
+export function extractInGameName(details?: any): string | null {
+  if (!details) return null;
+  const parsed = typeof details === 'string' ? (() => { try { return JSON.parse(details); } catch { return {}; } })() : details;
+  if (!parsed || typeof parsed !== 'object') return null;
+  for (const key of Object.keys(parsed)) {
+    if (/in[- ]*game\s*name/i.test(key) || /^ign$/i.test(key)) {
+      const val = String(parsed[key]).trim();
+      if (val) return val;
+    }
+  }
+  return null;
+}
+
+/**
+ * Resolve Discord Avatar URL using Discord User ID (with JAPI & Discord CDN fallback)
+ */
+export async function resolveDiscordAvatar(userId?: string | null, discordUsername?: string, gamerTag?: string): Promise<string> {
+  const cleanId = (userId || '').trim();
+  const cleanUser = (discordUsername || gamerTag || 'player').trim().replace(/^@/, '');
+
+  if (/^\d{16,21}$/.test(cleanId)) {
+    if (discordAvatarCache.has(cleanId)) {
+      return discordAvatarCache.get(cleanId)!;
+    }
+    try {
+      const res = await fetch(`https://japi.rest/discord/v1/user/${cleanId}`, {
+        signal: AbortSignal.timeout(3500)
+      });
+      if (res.ok) {
+        const json = (await res.json()) as any;
+        const data = json?.data;
+        if (data?.avatarURL) {
+          discordAvatarCache.set(cleanId, data.avatarURL);
+          return data.avatarURL;
+        }
+        if (data?.defaultAvatarURL) {
+          discordAvatarCache.set(cleanId, data.defaultAvatarURL);
+          return data.defaultAvatarURL;
+        }
+      }
+    } catch {}
+
+    // Discord CDN official snowflake calculation fallback
+    try {
+      const idx = Number((BigInt(cleanId) >> 22n) % 6n);
+      const url = `https://cdn.discordapp.com/embed/avatars/${idx}.png`;
+      discordAvatarCache.set(cleanId, url);
+      return url;
+    } catch {}
+  }
+
+  if (cleanUser && !cleanUser.includes(' ') && cleanUser.toLowerCase() !== 'n/a') {
+    return `https://unavatar.io/discord/${encodeURIComponent(cleanUser)}?fallback=https%3A%2F%2Fapi.dicebear.com%2F7.x%2Fbottts%2Fsvg%3Fseed%3D${encodeURIComponent(cleanUser)}%26backgroundColor%3D09090b%2C18181b`;
+  }
+
+  return `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(gamerTag || 'Player')}&backgroundColor=09090b,18181b`;
+}
+
+/**
+ * Synchronous instant Discord avatar getter
+ */
+export function getDiscordAvatar(discordUsername?: string, gamerTag?: string, userId?: string | null): string {
+  const cleanId = (userId || '').trim();
+  if (/^\d{16,21}$/.test(cleanId)) {
+    if (discordAvatarCache.has(cleanId)) {
+      return discordAvatarCache.get(cleanId)!;
+    }
+    // Calculate Discord default avatar immediately
+    try {
+      const idx = Number((BigInt(cleanId) >> 22n) % 6n);
+      const defaultUrl = `https://cdn.discordapp.com/embed/avatars/${idx}.png`;
+      // Schedule background upgrade if custom avatar exists
+      resolveDiscordAvatar(cleanId, discordUsername, gamerTag).catch(() => {});
+      return defaultUrl;
+    } catch {}
+  }
+
   const clean = (discordUsername || gamerTag || 'player').trim().replace(/^@/, '');
   if (!clean || clean.toLowerCase() === 'n/a') {
     return `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(gamerTag || 'player')}&backgroundColor=09090b,18181b`;
@@ -812,6 +934,46 @@ apiRouter.get('/leaderboard', async (req: Request, res: Response) => {
       supabaseDb.list<any>('registrations')
     ]);
 
+    // Build map of canonical Discord User IDs, Game UIDs, In-game Names for each player
+    const playerDiscordIdMap = new Map<string, string>();
+    const playerGameUidMap = new Map<string, string>();
+    const playerInGameNameMap = new Map<string, string>();
+    const playerDiscordUsernameMap = new Map<string, string>();
+
+    for (const reg of allRegistrations) {
+      const tag = (reg.gamerTag || reg.gamer_tag || '').trim().toLowerCase();
+      if (!tag) continue;
+      const details = reg.gameSpecificDetails || reg.game_specific_details;
+      const uid = extractDiscordUserId(details, reg.discordUsername || reg.discord_username);
+      if (uid && !playerDiscordIdMap.has(tag)) {
+        playerDiscordIdMap.set(tag, uid);
+      }
+      const gUid = extractGameUid(details);
+      if (gUid && !playerGameUidMap.has(tag)) {
+        playerGameUidMap.set(tag, gUid);
+      }
+      const ign = extractInGameName(details);
+      if (ign && !playerInGameNameMap.has(tag)) {
+        playerInGameNameMap.set(tag, ign);
+      }
+      const dcUser = (reg.discordUsername || reg.discord_username || '').trim();
+      if (dcUser && dcUser !== 'N/A' && !playerDiscordUsernameMap.has(tag)) {
+        playerDiscordUsernameMap.set(tag, dcUser);
+      }
+    }
+    for (const p of allPlayers) {
+      const tag = (p.gamerTag || p.gamer_tag || '').trim().toLowerCase();
+      if (!tag) continue;
+      const uid = extractDiscordUserId(null, p.discordUsername || p.discord_username);
+      if (uid && !playerDiscordIdMap.has(tag)) {
+        playerDiscordIdMap.set(tag, uid);
+      }
+      const dcUser = (p.discordUsername || p.discord_username || '').trim();
+      if (dcUser && dcUser !== 'N/A' && !playerDiscordUsernameMap.has(tag)) {
+        playerDiscordUsernameMap.set(tag, dcUser);
+      }
+    }
+
     // Map strictly keyed by unique canonical player gamerTag: cleanTag
     const map = new Map<string, any>();
 
@@ -827,7 +989,12 @@ apiRouter.get('/leaderboard', async (req: Request, res: Response) => {
       const matches = Number(lb.matches) || 0;
       const score = Number(lb.score) || 0;
       const lbGame = lb.game || 'ALL';
-      const avatar = lb.avatar || getDiscordAvatar(lb.discordUsername || lb.discord_username, lb.gamerTag || lb.gamer_tag);
+      const discordUserId = playerDiscordIdMap.get(cleanTag) || extractDiscordUserId(null, lb.discordUsername || lb.discord_username);
+      
+      let avatar = lb.avatar;
+      if (!avatar || avatar.includes('images.unsplash.com') || (discordUserId && avatar.includes('unavatar.io'))) {
+        avatar = getDiscordAvatar(lb.discordUsername || lb.discord_username, lb.gamerTag || lb.gamer_tag, discordUserId);
+      }
 
       if (!existing) {
         map.set(cleanTag, {
@@ -836,6 +1003,7 @@ apiRouter.get('/leaderboard', async (req: Request, res: Response) => {
           playerName: lb.playerName || lb.player_name || lb.gamerTag || lb.gamer_tag,
           gamerTag: lb.gamerTag || lb.gamer_tag,
           discordUsername: lb.discordUsername || lb.discord_username || 'N/A',
+          discordUserId: discordUserId || null,
           game: lbGame,
           gamesSet: new Set([lbGame.toUpperCase()]),
           avatar,
@@ -851,7 +1019,10 @@ apiRouter.get('/leaderboard', async (req: Request, res: Response) => {
         existing.matches = Math.max(existing.matches, matches);
         existing.score = Math.max(existing.score, score);
         if (lbGame) existing.gamesSet.add(lbGame.toUpperCase());
-        if (!existing.avatar || existing.avatar.includes('images.unsplash.com')) existing.avatar = avatar;
+        if (!existing.avatar || existing.avatar.includes('images.unsplash.com') || (discordUserId && existing.avatar.includes('unavatar.io'))) {
+          existing.avatar = avatar;
+        }
+        if (discordUserId) existing.discordUserId = discordUserId;
       }
     }
 
@@ -861,7 +1032,12 @@ apiRouter.get('/leaderboard', async (req: Request, res: Response) => {
       const cleanTag = (p.gamerTag || p.gamer_tag || '').trim().toLowerCase();
       if (!cleanTag) continue;
       const pGame = p.game || 'ALL';
-      const pAvatar = p.avatar || getDiscordAvatar(p.discordUsername || p.discord_username, p.gamerTag || p.gamer_tag);
+      const discordUserId = playerDiscordIdMap.get(cleanTag) || extractDiscordUserId(null, p.discordUsername || p.discord_username);
+      
+      let pAvatar = p.avatar;
+      if (!pAvatar || pAvatar.includes('images.unsplash.com') || (discordUserId && pAvatar.includes('unavatar.io'))) {
+        pAvatar = getDiscordAvatar(p.discordUsername || p.discord_username, p.gamerTag || p.gamer_tag, discordUserId);
+      }
 
       if (!map.has(cleanTag)) {
         map.set(cleanTag, {
@@ -870,6 +1046,7 @@ apiRouter.get('/leaderboard', async (req: Request, res: Response) => {
           playerName: p.fullName || p.full_name || p.gamerTag || p.gamer_tag,
           gamerTag: p.gamerTag || p.gamer_tag,
           discordUsername: p.discordUsername || p.discord_username || 'N/A',
+          discordUserId: discordUserId || null,
           game: pGame,
           gamesSet: new Set([pGame.toUpperCase()]),
           avatar: pAvatar,
@@ -888,6 +1065,7 @@ apiRouter.get('/leaderboard', async (req: Request, res: Response) => {
         if (p.fullName && (!existing.playerName || existing.playerName === existing.gamerTag)) {
           existing.playerName = p.fullName;
         }
+        if (discordUserId) existing.discordUserId = discordUserId;
       }
     }
 
@@ -897,6 +1075,7 @@ apiRouter.get('/leaderboard', async (req: Request, res: Response) => {
       const cleanTag = (reg.gamerTag || reg.gamer_tag || '').trim().toLowerCase();
       if (!cleanTag) continue;
       const regGame = (reg.gameName || reg.gameId || 'ALL').toUpperCase();
+      const discordUserId = playerDiscordIdMap.get(cleanTag) || extractDiscordUserId(reg.gameSpecificDetails || reg.game_specific_details, reg.discordUsername || reg.discord_username);
 
       if (!map.has(cleanTag)) {
         map.set(cleanTag, {
@@ -905,9 +1084,10 @@ apiRouter.get('/leaderboard', async (req: Request, res: Response) => {
           playerName: reg.playerName || reg.player_name || reg.gamerTag || reg.gamer_tag,
           gamerTag: reg.gamerTag || reg.gamer_tag,
           discordUsername: reg.discordUsername || reg.discord_username || 'N/A',
+          discordUserId: discordUserId || null,
           game: regGame,
           gamesSet: new Set([regGame]),
-          avatar: getDiscordAvatar(reg.discordUsername || reg.discord_username, reg.gamerTag || reg.gamer_tag),
+          avatar: getDiscordAvatar(reg.discordUsername || reg.discord_username, reg.gamerTag || reg.gamer_tag, discordUserId),
           points: 0,
           wins: 0,
           matches: 0,
@@ -917,6 +1097,7 @@ apiRouter.get('/leaderboard', async (req: Request, res: Response) => {
       } else {
         const existing = map.get(cleanTag)!;
         existing.gamesSet.add(regGame);
+        if (discordUserId) existing.discordUserId = discordUserId;
       }
     }
 
@@ -939,23 +1120,55 @@ apiRouter.get('/leaderboard', async (req: Request, res: Response) => {
       return rest;
     });
 
-    // Dynamic Deterministic Rank Sort: points DESC -> wins DESC -> score DESC -> matches ASC -> gamerTag ASC
+    // Dynamic Deterministic Rank Sort: points DESC -> wins DESC -> score DESC -> discordVerified DESC -> matches ASC -> gamerTag ASC
     formattedEntries.sort((a, b) => {
       if ((b.points || 0) !== (a.points || 0)) return (b.points || 0) - (a.points || 0);
       if ((b.wins || 0) !== (a.wins || 0)) return (b.wins || 0) - (a.wins || 0);
       if ((b.score || 0) !== (a.score || 0)) return (b.score || 0) - (a.score || 0);
+      const aVerified = a.discordUserId ? 1 : 0;
+      const bVerified = b.discordUserId ? 1 : 0;
+      if (bVerified !== aVerified) return bVerified - aVerified;
       if ((a.matches || 0) !== (b.matches || 0)) return (a.matches || 0) - (b.matches || 0);
-      return (a.gamerTag || '').localeCompare(b.gamerTag || '');
+      const aClean = (a.gamerTag || a.playerName || '').replace(/^[^\w]+/g, '');
+      const bClean = (b.gamerTag || b.playerName || '').replace(/^[^\w]+/g, '');
+      return aClean.localeCompare(bClean);
     });
 
     const ranked = formattedEntries.map((r, index) => {
+      const cleanTag = (r.gamerTag || '').trim().toLowerCase();
+      const discordUserId = r.discordUserId || playerDiscordIdMap.get(cleanTag) || extractDiscordUserId(null, r.discordUsername);
+      const freeFireUid = playerGameUidMap.get(cleanTag) || r.freeFireUid || null;
+      const inGameName = playerInGameNameMap.get(cleanTag) || r.inGameName || null;
+      const discordUsername = playerDiscordUsernameMap.get(cleanTag) || r.discordUsername || 'N/A';
+      
       let avatar = r.avatar;
-      if (!avatar || avatar.includes('images.unsplash.com') || avatar.trim() === '') {
-        avatar = getDiscordAvatar(r.discordUsername, r.gamerTag);
+      if (!avatar || avatar.includes('images.unsplash.com') || avatar.trim() === '' || (discordUserId && avatar.includes('unavatar.io'))) {
+        avatar = getDiscordAvatar(discordUsername, r.gamerTag, discordUserId);
       }
+
+      const totalPoints = Number(r.points) || 0;
+      const wins = Number(r.wins) || 0;
+      const matches = Number(r.matches) || 0;
+      const kills = Number(r.score) || 0;
+
+      // Calculable points breakdown according to Blackhawk specifications
+      const placementPoints = Math.max(0, wins * 10);
+      const killPoints = kills;
+      const participationPoints = Math.max(0, matches > wins ? (matches - wins) : 0);
+      const challengeBonus = Math.max(0, totalPoints - placementPoints - killPoints - participationPoints);
+
       return {
         ...r,
         avatar,
+        discordUsername,
+        discordUserId: discordUserId || undefined,
+        freeFireUid: freeFireUid || undefined,
+        inGameName: inGameName || undefined,
+        placementPoints,
+        killPoints,
+        participationPoints,
+        challengeBonus,
+        totalPoints,
         rank: index + 1,
         crown: index === 0,
       };

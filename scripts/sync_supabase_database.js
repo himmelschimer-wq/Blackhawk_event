@@ -7,13 +7,79 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
   auth: { persistSession: false }
 });
 
-function getDiscordAvatar(discordUsername, gamerTag) {
-  const clean = (discordUsername || '').trim();
-  const seed = encodeURIComponent(clean || gamerTag || 'Player');
-  if (clean && !clean.includes(' ') && clean !== 'N/A') {
-    return `https://unavatar.io/discord/${seed}?fallback=https%3A%2F%2Fapi.dicebear.com%2F7.x%2Fbottts%2Fsvg%3Fseed%3D${seed}%26backgroundColor%3D09090b%2C18181b`;
+// Cache for Discord avatar resolution
+const avatarCache = new Map();
+
+/**
+ * Extract Discord User ID (17-21 digits snowflake) from registration details or discord username
+ */
+export function extractDiscordUserId(details, discordUsername) {
+  if (details && typeof details === 'object') {
+    for (const key of Object.keys(details)) {
+      if (/discord.*(user.*)?id/i.test(key)) {
+        const val = String(details[key]).trim();
+        if (/^\d{16,21}$/.test(val)) return val;
+      }
+    }
+    // Also check standard UID if it matches Discord snowflake length
+    if (details.UID && /^\d{17,20}$/.test(String(details.UID).trim())) {
+      // Free Fire UIDs are typically 8-10 digits, Discord snowflakes are 17-20 digits
+      return String(details.UID).trim();
+    }
   }
-  return `https://api.dicebear.com/7.x/bottts/svg?seed=${seed}&backgroundColor=09090b,18181b`;
+  const cleanDiscord = (discordUsername || '').trim();
+  if (/^\d{16,21}$/.test(cleanDiscord)) {
+    return cleanDiscord;
+  }
+  return null;
+}
+
+/**
+ * Resolve Discord Avatar URL using Discord User ID via JAPI and Discord CDN
+ */
+export async function resolveDiscordAvatar(userId, discordUsername, gamerTag) {
+  const cleanId = (userId || '').trim();
+  const cleanUser = (discordUsername || gamerTag || 'player').trim().replace(/^@/, '');
+
+  if (/^\d{16,21}$/.test(cleanId)) {
+    if (avatarCache.has(cleanId)) {
+      return avatarCache.get(cleanId);
+    }
+    try {
+      const res = await fetch(`https://japi.rest/discord/v1/user/${cleanId}`, {
+        signal: AbortSignal.timeout(4000)
+      });
+      if (res.ok) {
+        const json = await res.json();
+        const data = json?.data;
+        if (data?.avatarURL) {
+          avatarCache.set(cleanId, data.avatarURL);
+          return data.avatarURL;
+        }
+        if (data?.defaultAvatarURL) {
+          avatarCache.set(cleanId, data.defaultAvatarURL);
+          return data.defaultAvatarURL;
+        }
+      }
+    } catch (e) {
+      console.warn(`[Discord Avatar] JAPI lookup failed for ID ${cleanId}:`, e.message);
+    }
+
+    // Instant Discord CDN snowflake calculation fallback
+    try {
+      const idx = Number((BigInt(cleanId) >> 22n) % 6n);
+      const discordEmbedAvatar = `https://cdn.discordapp.com/embed/avatars/${idx}.png`;
+      avatarCache.set(cleanId, discordEmbedAvatar);
+      return discordEmbedAvatar;
+    } catch {}
+  }
+
+  // Fallback to username unavatar
+  if (cleanUser && !cleanUser.includes(' ') && cleanUser !== 'N/A') {
+    return `https://unavatar.io/discord/${encodeURIComponent(cleanUser)}?fallback=https%3A%2F%2Fapi.dicebear.com%2F7.x%2Fbottts%2Fsvg%3Fseed%3D${encodeURIComponent(cleanUser)}%26backgroundColor%3D09090b%2C18181b`;
+  }
+
+  return `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(gamerTag || 'Player')}&backgroundColor=09090b,18181b`;
 }
 
 export async function syncRegistrationsAndPlayers() {
@@ -64,8 +130,18 @@ export async function syncRegistrationsAndPlayers() {
   const activePlayers = cleanPlayers || [];
   const activeLb = cleanLb || [];
 
+  // Map gamer_tag -> discord_user_id found across registrations
+  const playerDiscordIdMap = new Map();
+  for (const r of activeRegs) {
+    const normTag = (r.gamer_tag || '').trim().toLowerCase();
+    const uid = extractDiscordUserId(r.game_specific_details, r.discord_username);
+    if (normTag && uid && !playerDiscordIdMap.has(normTag)) {
+      playerDiscordIdMap.set(normTag, uid);
+    }
+  }
+
   // 4. Map existing players by normalized gamer_tag
-  const playerMap = new Map(); // normalized tag -> player record
+  const playerMap = new Map();
   for (const p of activePlayers) {
     const normTag = (p.gamer_tag || '').trim().toLowerCase();
     if (!normTag) continue;
@@ -75,7 +151,7 @@ export async function syncRegistrationsAndPlayers() {
   }
 
   // 5. Process every registration: Trim fields, deduplicate, ensure player exists
-  const regMap = new Map(); // key -> unique registration
+  const regMap = new Map();
   for (const reg of activeRegs) {
     const trimmedTag = (reg.gamer_tag || '').trim();
     const trimmedName = (reg.player_name || trimmedTag).trim();
@@ -125,7 +201,6 @@ export async function syncRegistrationsAndPlayers() {
     // Key for duplicate detection: tag + game_id + event_id
     const dupKey = `${normTag}_${gameId}_${reg.event_id || 'general'}`;
     if (!regMap.has(dupKey)) {
-      // First registration for this game
       regMap.set(dupKey, reg);
       
       // Update registration with normalized player_id and trimmed tags
@@ -141,13 +216,12 @@ export async function syncRegistrationsAndPlayers() {
       }).eq('id', reg.id);
       console.log(`✓ Synchronized registration ${reg.id} for ${trimmedTag} -> Player ID: ${player.id}`);
     } else {
-      // Duplicate registration found -> delete redundant row
       console.log(`🗑️ Removing duplicate registration ${reg.id} for player ${trimmedTag} in game ${gameName}`);
       await supabase.from('registrations').delete().eq('id', reg.id);
     }
   }
 
-  // 6. Ensure every Player in `players` has a corresponding entry in `leaderboard`
+  // 6. Ensure every Player in `players` has a corresponding entry in `leaderboard` with Discord PFP
   const { data: finalPlayers } = await supabase.from('players').select('*');
   const { data: currentLb } = await supabase.from('leaderboard').select('*');
   const lbTagMap = new Map();
@@ -161,7 +235,11 @@ export async function syncRegistrationsAndPlayers() {
     if (!normTag) continue;
 
     const existingLb = lbTagMap.get(normTag);
-    const pfp = getDiscordAvatar(p.discord_username, p.gamer_tag);
+    const discordUserId = playerDiscordIdMap.get(normTag) || extractDiscordUserId(null, p.discord_username);
+    
+    // Resolve real Discord avatar using Discord User ID
+    const pfp = await resolveDiscordAvatar(discordUserId, p.discord_username, p.gamer_tag);
+    console.log(`🎨 Resolved PFP for [${p.gamer_tag}] (Discord ID: ${discordUserId || 'none'}): ${pfp}`);
 
     if (!existingLb) {
       const newLbId = `lb-${p.id}`;
@@ -182,17 +260,18 @@ export async function syncRegistrationsAndPlayers() {
         updated_at: new Date().toISOString()
       };
       await supabase.from('leaderboard').upsert(lbEntry, { onConflict: 'id' });
-      console.log(`🏆 Created synced leaderboard entry for player ${p.gamer_tag}`);
+      console.log(`🏆 Created synced leaderboard entry for player ${p.gamer_tag} with Discord avatar`);
     } else {
-      // Update info
+      // Update info & replace avatar with real Discord PFP
       await supabase.from('leaderboard').update({
         player_id: p.id,
         player_name: p.full_name || p.gamer_tag,
         gamer_tag: p.gamer_tag,
         discord_username: p.discord_username || 'N/A',
-        avatar: existingLb.avatar || pfp,
+        avatar: pfp,
         updated_at: new Date().toISOString()
       }).eq('id', existingLb.id);
+      console.log(`🔄 Updated leaderboard avatar for player ${p.gamer_tag}`);
     }
   }
 
@@ -208,14 +287,9 @@ export async function syncRegistrationsAndPlayers() {
   console.log(`✅ Total Registrations: ${vRegs?.length}`);
   console.log(`✅ Total Leaderboard  : ${vLb?.length}`);
   console.log('----------------------------------------------------');
-  console.log('Synced Players:');
-  vPlayers?.forEach((p, idx) => {
-    console.log(` ${idx + 1}. [${p.id}] ${p.full_name} (@${p.gamer_tag}) - Discord: ${p.discord_username}`);
-  });
-  console.log('----------------------------------------------------');
-  console.log('Synced Registrations:');
-  vRegs?.forEach((r, idx) => {
-    console.log(` ${idx + 1}. [${r.id}] Player: ${r.player_name} (@${r.gamer_tag}) -> Game: ${r.game_name} | Player ID: ${r.player_id}`);
+  console.log('Leaderboard Avatars:');
+  vLb?.forEach((l, idx) => {
+    console.log(` ${idx + 1}. [${l.id}] ${l.player_name} (@${l.gamer_tag}) -> Avatar: ${l.avatar}`);
   });
   console.log('====================================================\n');
 
@@ -224,7 +298,8 @@ export async function syncRegistrationsAndPlayers() {
     registrationsCount: vRegs?.length || 0,
     leaderboardCount: vLb?.length || 0,
     players: vPlayers,
-    registrations: vRegs
+    registrations: vRegs,
+    leaderboard: vLb
   };
 }
 
