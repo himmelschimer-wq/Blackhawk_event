@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { tournamentStore } from '../lib/tournamentStore';
 import { X, Trophy, ShieldCheck, CheckCircle } from 'lucide-react';
 import { sfx } from '../utils/sfx';
@@ -9,16 +10,55 @@ interface PlayerPointHistoryModalProps {
 }
 
 export const PlayerPointHistoryModal: React.FC<PlayerPointHistoryModalProps> = ({ playerId, onClose }) => {
+  useEffect(() => {
+    if (!playerId) return;
+
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        sfx.playClick();
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [playerId, onClose]);
+
   if (!playerId) return null;
+  if (typeof document === 'undefined') return null;
 
   const data = tournamentStore.getPlayerPointHistory(playerId);
   if (!data) return null;
 
   const { player, totalPoints, history } = data;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-[#0c0c12] border-2 border-red-600/50 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-[0_0_50px_rgba(225,6,0,0.3)] relative">
+  return createPortal(
+    <div 
+      className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
+      role="dialog"
+      aria-modal="true"
+    >
+      {/* ─── Fullscreen Backdrop Overlay ─── */}
+      <div
+        className="fixed inset-0 bg-black/85 backdrop-blur-md transition-opacity animate-in fade-in duration-200 cursor-pointer"
+        onClick={() => {
+          sfx.playClick();
+          onClose();
+        }}
+        aria-hidden="true"
+      />
+
+      {/* ─── Modal Dialog Card ─── */}
+      <div 
+        className="bg-[#0c0c12] border-2 border-red-600/50 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-[0_0_50px_rgba(225,6,0,0.3)] relative z-10 my-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
         
         {/* Top Header */}
         <div className="p-6 border-b border-white/10 flex items-center justify-between bg-gradient-to-r from-red-950/40 via-black to-black">
@@ -158,6 +198,8 @@ export const PlayerPointHistoryModal: React.FC<PlayerPointHistoryModalProps> = (
         </div>
 
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
+
