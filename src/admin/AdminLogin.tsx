@@ -79,7 +79,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onExitTo
                 required
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="e.g. admin"
+                placeholder="Enter username"
                 className="w-full pl-9 pr-3 py-2.5 rounded-lg bg-[#08080a] border border-white/10 text-white text-xs placeholder:text-zinc-600 focus:outline-none focus:border-[#D71920] transition-colors"
               />
             </div>

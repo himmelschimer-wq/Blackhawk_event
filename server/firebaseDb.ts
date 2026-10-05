@@ -72,11 +72,11 @@ export async function initFirebaseDatabase() {
   try {
     console.log('[Firebase DB] Initializing pure Firebase Realtime Database driver...');
 
-    // 1. Seed Admin in Firebase
+    // 1. Seed Admin in Firebase (only if explicit environment credentials are provided)
     const admins = await firebaseDb.list('admins');
-    if (admins.length === 0) {
-      const adminUser = process.env.ADMIN_USERNAME || 'admin';
-      const adminPass = process.env.ADMIN_PASSWORD || 'blackhawk2026!';
+    if (admins.length === 0 && process.env.ADMIN_USERNAME && process.env.ADMIN_PASSWORD) {
+      const adminUser = process.env.ADMIN_USERNAME.trim();
+      const adminPass = process.env.ADMIN_PASSWORD.trim();
       const salt = bcrypt.genSaltSync(10);
       const hash = bcrypt.hashSync(adminPass, salt);
       const adminId = 'adm-' + Date.now();
@@ -89,7 +89,7 @@ export async function initFirebaseDatabase() {
         role: 'ADMIN',
         createdAt: new Date().toISOString()
       });
-      console.log(`[Firebase DB] Created default admin "${adminUser}" in Firebase.`);
+      console.log(`[Firebase DB] Created admin "${adminUser}" in Firebase from environment configuration.`);
     }
 
     // 2. Seed Default Games in Firebase

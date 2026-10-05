@@ -149,11 +149,11 @@ export function initDatabase() {
     );
   `);
 
-  // Seed default admin if no admin exists
+  // Seed default admin if no admin exists (only if explicit environment credentials are provided)
   const adminCount = db.prepare('SELECT COUNT(*) as count FROM admins').get() as { count: number };
-  if (adminCount.count === 0) {
-    const adminUser = process.env.ADMIN_USERNAME || 'admin';
-    const adminPass = process.env.ADMIN_PASSWORD || 'blackhawk2026!';
+  if (adminCount.count === 0 && process.env.ADMIN_USERNAME && process.env.ADMIN_PASSWORD) {
+    const adminUser = process.env.ADMIN_USERNAME.trim();
+    const adminPass = process.env.ADMIN_PASSWORD.trim();
     const salt = bcrypt.genSaltSync(10);
     const hash = bcrypt.hashSync(adminPass, salt);
     const adminId = 'adm-' + Date.now();
@@ -163,7 +163,7 @@ export function initDatabase() {
       VALUES (?, ?, ?, ?, ?, ?)
     `).run(adminId, adminUser, 'BlackHawk High Command', hash, 'ADMIN', new Date().toISOString());
     
-    console.log(`[Database] Initial admin created: username="${adminUser}"`);
+    console.log(`[Database] Initial admin created from environment: username="${adminUser}"`);
   }
 
   // Seed default games if table is empty

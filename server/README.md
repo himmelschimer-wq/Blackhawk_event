@@ -31,8 +31,8 @@ Default server URL: `http://localhost:3001`
 | `NODE_ENV` | Runtime environment (`production` / `development`) | `development` |
 | `CORS_ORIGIN` | Allowed CORS origins (comma-separated or `*`) | `*` |
 | `FIREBASE_DATABASE_URL` | Firebase Realtime Database URL | *Asia Southeast 1 default* |
-| `ADMIN_USERNAME` | Default admin username seeded on initial boot | `admin` |
-| `ADMIN_PASSWORD` | Default admin password seeded on initial boot | `blackhawk2026!` |
+| `ADMIN_USERNAME` | Admin username seeded on initial boot (optional) | *None* |
+| `ADMIN_PASSWORD` | Admin password seeded on initial boot (optional) | *None* |
 | `DISCORD_CLIENT_ID` | Discord Application Client ID for OAuth2 | *(optional)* |
 | `DISCORD_CLIENT_SECRET` | Discord Application Secret | *(optional)* |
 | `DISCORD_GUILD_ID` | Discord Server ID to check membership | *(optional)* |

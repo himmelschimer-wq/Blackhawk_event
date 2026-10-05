@@ -284,11 +284,11 @@ export async function initSupabaseDatabase() {
   try {
     console.log('[Supabase DB] Checking & initializing Supabase database tables...');
 
-    // 1. Seed Admin
+    // 1. Seed Admin (only if explicit environment credentials are provided)
     const admins = await supabaseDb.list('admins');
-    if (admins.length === 0) {
-      const adminUser = process.env.ADMIN_USERNAME || 'admin';
-      const adminPass = process.env.ADMIN_PASSWORD || 'blackhawk2026!';
+    if (admins.length === 0 && process.env.ADMIN_USERNAME && process.env.ADMIN_PASSWORD) {
+      const adminUser = process.env.ADMIN_USERNAME.trim();
+      const adminPass = process.env.ADMIN_PASSWORD.trim();
       const salt = bcrypt.genSaltSync(10);
       const hash = bcrypt.hashSync(adminPass, salt);
       const adminId = 'adm-' + Date.now();
@@ -301,7 +301,7 @@ export async function initSupabaseDatabase() {
         role: 'ADMIN',
         createdAt: new Date().toISOString()
       });
-      console.log(`[Supabase DB] Seeded default admin "${adminUser}".`);
+      console.log(`[Supabase DB] Seeded admin "${adminUser}" from environment configuration.`);
     }
 
     // 2. Seed Default Games

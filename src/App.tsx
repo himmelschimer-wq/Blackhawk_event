@@ -23,10 +23,15 @@ export function App() {
     window.location.hash.startsWith('#discord-callback')
   );
 
+  // Admin Panel Access Switch
+  // Set to false: Completely removes and blocks all ways to access the admin panel (routes, hash, hotkeys, sessions)
+  // The admin components and files remain intact in the codebase without deletion.
+  const ADMIN_ACCESS_ENABLED = false;
+
   const [isAdminRoute, setIsAdminRoute] = useState(false);
   const [adminTab, setAdminTab] = useState<string>('dashboard');
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-  const [authChecking, setAuthChecking] = useState<boolean>(true);
+  const [authChecking, setAuthChecking] = useState<boolean>(false);
   const [showIntroSplash, setShowIntroSplash] = useState<boolean>(true);
   const [siteRevealed, setSiteRevealed] = useState(false);
 
@@ -42,6 +47,32 @@ export function App() {
 
   // Check Auth and sync routes
   const checkCurrentRouteAndAuth = async () => {
+    if (!ADMIN_ACCESS_ENABLED) {
+      if (typeof window !== 'undefined') {
+        // Purge any stored admin credentials/tokens
+        try {
+          localStorage.removeItem('blackhawk_admin_token');
+          localStorage.removeItem('BHT_ADMIN_ROLE');
+          localStorage.removeItem('BHT_ADMIN_NAME');
+          localStorage.removeItem('admin_token');
+        } catch {}
+
+        // Disallow /admin route and #admin hash - redirect cleanly to public site
+        const path = window.location.pathname.toLowerCase();
+        const hash = window.location.hash.toLowerCase();
+        if (path.startsWith('/admin')) {
+          window.history.replaceState({}, '', '/');
+        }
+        if (hash.startsWith('#admin') || hash.startsWith('#/admin')) {
+          window.history.replaceState({}, '', window.location.pathname);
+        }
+      }
+      setIsAdminRoute(false);
+      setIsAuthenticated(false);
+      setAuthChecking(false);
+      return;
+    }
+
     const path = window.location.pathname.toLowerCase();
     const hash = window.location.hash.toLowerCase();
 
@@ -86,37 +117,17 @@ export function App() {
       checkCurrentRouteAndAuth();
     };
 
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Secret Admin Hotkeys: Ctrl + Shift + A or Alt + A or Ctrl + Alt + A
-      if (
-        (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'a') ||
-        (e.altKey && e.key.toLowerCase() === 'a') ||
-        (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'a')
-      ) {
-        e.preventDefault();
-        handleOpenAdmin();
-      }
-    };
-
     window.addEventListener('hashchange', handleRouteChange);
     window.addEventListener('popstate', handleRouteChange);
-    window.addEventListener('keydown', handleKeyDown);
 
     return () => {
       window.removeEventListener('hashchange', handleRouteChange);
       window.removeEventListener('popstate', handleRouteChange);
-      window.removeEventListener('keydown', handleKeyDown);
     };
   }, []);
 
-  const handleOpenAdmin = () => {
-    setIsAdminRoute(true);
-    setAdminTab('dashboard');
-    window.location.hash = '#admin/dashboard';
-    checkCurrentRouteAndAuth();
-  };
-
   const handleAuthSuccess = () => {
+    if (!ADMIN_ACCESS_ENABLED) return;
     setIsAuthenticated(true);
     window.location.hash = '#admin/dashboard';
     setAdminTab('dashboard');
@@ -150,8 +161,8 @@ export function App() {
     return <DiscordCallback />;
   }
 
-  // If in Admin Mode
-  if (isAdminRoute) {
+  // If in Admin Mode (permanently disabled to prevent unauthorized access)
+  if (ADMIN_ACCESS_ENABLED && isAdminRoute) {
     if (authChecking) {
       return (
         <div className="min-h-screen bg-[#080808] flex items-center justify-center text-zinc-500 font-tech text-xs">
@@ -160,7 +171,6 @@ export function App() {
       );
     }
 
-    // Requirement 2: Unauthenticated /admin/* redirects to /admin/login
     if (!isAuthenticated) {
       return (
         <ErrorBoundary fallbackTitle="ADMIN LOGIN ERROR">

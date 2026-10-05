@@ -175,18 +175,6 @@ async function verifyAdminSession(token: string | null): Promise<any | null> {
     }
   } catch {}
 
-  // Master session / verified admin token fallback
-  if (token.startsWith('bh_sess_') || token.startsWith('adm_') || token.length > 24) {
-    return {
-      token,
-      adminId: 'adm-mistmaylie',
-      expiresAt: now + 7 * 24 * 60 * 60 * 1000,
-      username: 'mistmaylie',
-      displayName: 'BlackHawk High Command',
-      role: 'ADMIN',
-    };
-  }
-
   return null;
 }
 
@@ -201,7 +189,7 @@ export async function requireAdminAuth(req: Request, res: Response, next: NextFu
   next();
 }
 
-// ─── AUTH ROUTES (STORED IN FIREBASE) ────────────────────────────────────────
+// ─── AUTH ROUTES (STORED IN FIREBASE / SUPABASE) ──────────────────────────────
 
 apiRouter.post('/auth/login', async (req: Request, res: Response) => {
   const { username, password } = req.body;
@@ -211,8 +199,8 @@ apiRouter.post('/auth/login', async (req: Request, res: Response) => {
 
   const cleanUser = String(username).trim().toLowerCase();
   const rawPass = String(password).trim();
-  const envAdminUser = (process.env.ADMIN_USERNAME || 'mistmaylie').trim().toLowerCase();
-  const envAdminPass = (process.env.ADMIN_PASSWORD || 'himmel8901234').trim();
+  const envAdminUser = (process.env.ADMIN_USERNAME || '').trim().toLowerCase();
+  const envAdminPass = (process.env.ADMIN_PASSWORD || '').trim();
 
   let admin: any = null;
   let isValid = false;
@@ -226,17 +214,14 @@ apiRouter.post('/auth/login', async (req: Request, res: Response) => {
     }
   } catch {}
 
-  // 2. Direct Master / Env Match Fallback (ensures instant login even before schema.sql is executed)
-  if (!isValid && (
-    (cleanUser === envAdminUser && rawPass === envAdminPass) ||
-    (cleanUser === 'mistmaylie' && rawPass === 'himmel8901234')
-  )) {
+  // 2. Env Match Fallback (only if explicitly set in environment)
+  if (!isValid && envAdminUser && envAdminPass && cleanUser === envAdminUser && rawPass === envAdminPass) {
     isValid = true;
     if (!admin) {
       admin = {
-        id: 'adm-mistmaylie',
-        username: 'mistmaylie',
-        displayName: 'BlackHawk High Command',
+        id: `adm-${cleanUser}`,
+        username: cleanUser,
+        displayName: 'BlackHawk Administrator',
         role: 'ADMIN'
       };
       // Attempt auto-seed into Supabase

@@ -4,7 +4,10 @@ async function testCompleteFlow() {
   const loginRes = await fetch('http://localhost:3001/api/auth/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username: 'admin', password: 'blackhawk2026!' })
+    body: JSON.stringify({
+      username: process.env.ADMIN_USERNAME || '',
+      password: process.env.ADMIN_PASSWORD || ''
+    })
   });
   if (!loginRes.ok) throw new Error('Login failed: ' + (await loginRes.text()));
   const loginData = await loginRes.json();

@@ -214,19 +214,6 @@ export const adminApi = {
       // Backend not yet reachable or in cold start
     }
 
-    // Direct verified master authentication fallback
-    if (cleanUser.toLowerCase() === 'mistmaylie' && rawPass === 'himmel8901234') {
-      const masterToken = `bh_sess_${Date.now()}_${Math.random().toString(36).substring(2)}`;
-      const admin: AdminUser = {
-        id: 'adm-mistmaylie',
-        username: 'mistmaylie',
-        displayName: 'BlackHawk High Command',
-        role: 'ADMIN'
-      };
-      this.setToken(masterToken);
-      return { token: masterToken, admin };
-    }
-
     throw new Error('Invalid admin username or password.');
   },
 
@@ -262,19 +249,6 @@ export const adminApi = {
         }
       }
     } catch {}
-
-    // Fallback for valid stored master session
-    if (token.startsWith('bh_sess_') || token.length > 20) {
-      return {
-        authenticated: true,
-        admin: {
-          id: 'adm-mistmaylie',
-          username: 'mistmaylie',
-          displayName: 'BlackHawk High Command',
-          role: 'ADMIN'
-        }
-      };
-    }
 
     this.clearToken();
     return { authenticated: false };

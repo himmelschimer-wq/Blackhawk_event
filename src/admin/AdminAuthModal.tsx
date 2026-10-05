@@ -11,8 +11,8 @@ interface AdminAuthProps {
 
 export const AdminAuthModal: React.FC<AdminAuthProps> = ({ onSuccess, onCancel }) => {
   const [selectedRole, setSelectedRole] = useState<UserRole>('ADMIN');
-  const [adminName, setAdminName] = useState('Commander_Viper');
-  const [passkey, setPasskey] = useState('blackhawk2026');
+  const [adminName, setAdminName] = useState('');
+  const [passkey, setPasskey] = useState('');
   const [error, setError] = useState('');
 
   const handleLogin = (e: React.FormEvent) => {
@@ -23,15 +23,15 @@ export const AdminAuthModal: React.FC<AdminAuthProps> = ({ onSuccess, onCancel }
     }
 
     sfx.playClick();
-    tournamentStore.login(selectedRole, adminName || 'Blackhawk_Admin');
+    tournamentStore.login(selectedRole, adminName || 'Operator');
     sfx.playSuccess();
     onSuccess();
   };
 
-  const setRolePreset = (role: UserRole, defaultName: string) => {
+  const setRolePreset = (role: UserRole, defaultName: string = '') => {
     sfx.playClick();
     setSelectedRole(role);
-    setAdminName(defaultName);
+    if (defaultName) setAdminName(defaultName);
     setError('');
   };
 
@@ -61,7 +61,7 @@ export const AdminAuthModal: React.FC<AdminAuthProps> = ({ onSuccess, onCancel }
           <div className="grid grid-cols-3 gap-2">
             <button
               type="button"
-              onClick={() => setRolePreset('ADMIN', 'SuperAdmin_Hawk')}
+              onClick={() => setRolePreset('ADMIN')}
               className={`p-3 rounded-lg border text-center transition-all ${
                 selectedRole === 'ADMIN'
                   ? 'bg-red-950/80 border-red-500 text-white shadow-[0_0_15px_rgba(225,6,0,0.5)]'
@@ -75,7 +75,7 @@ export const AdminAuthModal: React.FC<AdminAuthProps> = ({ onSuccess, onCancel }
 
             <button
               type="button"
-              onClick={() => setRolePreset('ORGANIZER', 'OpsDirector_Rohan')}
+              onClick={() => setRolePreset('ORGANIZER')}
               className={`p-3 rounded-lg border text-center transition-all ${
                 selectedRole === 'ORGANIZER'
                   ? 'bg-red-950/80 border-red-500 text-white shadow-[0_0_15px_rgba(225,6,0,0.5)]'
@@ -89,7 +89,7 @@ export const AdminAuthModal: React.FC<AdminAuthProps> = ({ onSuccess, onCancel }
 
             <button
               type="button"
-              onClick={() => setRolePreset('VIEWER', 'Auditor_Spectator')}
+              onClick={() => setRolePreset('VIEWER')}
               className={`p-3 rounded-lg border text-center transition-all ${
                 selectedRole === 'VIEWER'
                   ? 'bg-red-950/80 border-red-500 text-white shadow-[0_0_15px_rgba(225,6,0,0.5)]'
@@ -114,14 +114,14 @@ export const AdminAuthModal: React.FC<AdminAuthProps> = ({ onSuccess, onCancel }
               required
               value={adminName}
               onChange={e => setAdminName(e.target.value)}
+              placeholder="Enter operator handle..."
               className="w-full px-3.5 py-2.5 bg-black/60 border border-white/10 rounded-lg font-tech text-sm text-white focus:outline-none focus:border-red-500 transition-colors"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-tech text-zinc-300 uppercase tracking-wider mb-1 font-semibold flex items-center justify-between">
-              <span>Security Passkey</span>
-              <span className="text-[10px] text-zinc-500 font-mono">Demo: blackhawk2026</span>
+            <label className="block text-xs font-tech text-zinc-300 uppercase tracking-wider mb-1 font-semibold">
+              Security Passkey
             </label>
             <div className="relative">
               <Lock className="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2" />

@@ -320,18 +320,16 @@ END $$;
 -- INITIAL SEED DATA
 -- ==============================================================================
 
--- 1. Secure Admin Seed
-INSERT INTO public.admins (id, username, display_name, password_hash, role)
-VALUES (
-    'adm-mistmaylie',
-    'mistmaylie',
-    'BlackHawk High Command',
-    '$2b$10$jU2MmnrNw4l5h8SH/2/ouOMKWWZdhJSuI65Kwq2ZYenB.CP.6sc/K',
-    'ADMIN'
-)
-ON CONFLICT (username) DO UPDATE SET
-    password_hash = EXCLUDED.password_hash,
-    display_name = EXCLUDED.display_name;
+-- 1. Admin Seed (Disabled / Commented out - no hardcoded credentials)
+-- INSERT INTO public.admins (id, username, display_name, password_hash, role)
+-- VALUES (
+--     'adm-root',
+--     'admin',
+--     'BlackHawk High Command',
+--     '$2b$10$...',
+--     'ADMIN'
+-- )
+-- ON CONFLICT (username) DO NOTHING;
 
 -- 2. Official Games Seed
 INSERT INTO public.games (id, name, description, logo, banner, category, default_prize_pool, format, active)
