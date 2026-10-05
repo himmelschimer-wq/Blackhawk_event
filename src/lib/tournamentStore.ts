@@ -381,41 +381,7 @@ const INITIAL_RESULTS: MatchResultRecord[] = [
   }
 ];
 
-const INITIAL_AUDIT_LOGS: AuditLogRecord[] = [
-  {
-    id: 'log-1',
-    adminUser: 'Admin_Blackhawk',
-    role: 'ADMIN',
-    action: 'PUBLISH_RESULTS',
-    targetEntity: 'Event Results',
-    targetId: 'evt-1',
-    oldValue: 'DRAFT',
-    newValue: 'PUBLISHED (5 results updated)',
-    timestamp: '2026-09-23T18:00:00Z'
-  },
-  {
-    id: 'log-2',
-    adminUser: 'Organizer_Dev',
-    role: 'ORGANIZER',
-    action: 'AWARD_RISING_STAR',
-    targetEntity: 'Player Points',
-    targetId: 'p-4',
-    oldValue: '1 pt',
-    newValue: '+2 pts bonus awarded (ApexBlaze)',
-    timestamp: '2026-09-23T17:45:00Z'
-  },
-  {
-    id: 'log-3',
-    adminUser: 'Admin_Blackhawk',
-    role: 'ADMIN',
-    action: 'APPROVE_REGISTRATION',
-    targetEntity: 'Registration',
-    targetId: 'BHL-712849',
-    oldValue: 'REGISTERED',
-    newValue: 'APPROVED',
-    timestamp: '2026-09-21T10:15:00Z'
-  }
-];
+const INITIAL_AUDIT_LOGS: AuditLogRecord[] = [];
 
 const INITIAL_REWARDS: RewardConfig = {
   mainCompetition: 150,
@@ -435,7 +401,7 @@ class TournamentStore {
   private auditLogs: AuditLogRecord[] = INITIAL_AUDIT_LOGS;
   private rewardsConfig: RewardConfig = INITIAL_REWARDS;
   private currentRole: UserRole | null = null;
-  private currentAdminName: string = 'Blackhawk_Admin';
+  private currentAdminName: string = 'Operator';
   private listeners: Array<() => void> = [];
   private leaderboardAvatars: Map<string, string> = new Map();
 

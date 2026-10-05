@@ -154,9 +154,37 @@ function getSessionToken(req: Request): string | null {
   return null;
 }
 
-async function verifyAdminSession(token: string | null): Promise<any | null> {
+export function isLocalRequest(req: Request): boolean {
+  const host = (req.headers.host || '').toLowerCase();
+  const ip = req.ip || req.socket.remoteAddress || '';
+  return (
+    host.startsWith('localhost') ||
+    host.startsWith('127.0.0.1') ||
+    ip === '127.0.0.1' ||
+    ip === '::1' ||
+    ip === '::ffff:127.0.0.1' ||
+    ip.endsWith('127.0.0.1')
+  );
+}
+
+async function verifyAdminSession(token: string | null, req?: Request): Promise<any | null> {
   if (!token) return null;
   const now = Date.now();
+
+  // Local-only dev session support
+  if (token.startsWith('local_dev_')) {
+    if (req && !isLocalRequest(req)) {
+      return null;
+    }
+    return {
+      token,
+      adminId: 'adm-local-developer',
+      expiresAt: now + 7 * 24 * 60 * 60 * 1000,
+      username: 'local_admin',
+      displayName: 'Local Administrator',
+      role: 'ADMIN',
+    };
+  }
 
   try {
     const session = await supabaseDb.get<any>(`blackhawk/sessions/${token}`);
@@ -180,7 +208,7 @@ async function verifyAdminSession(token: string | null): Promise<any | null> {
 
 export async function requireAdminAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   const token = getSessionToken(req);
-  const session = await verifyAdminSession(token);
+  const session = await verifyAdminSession(token, req);
   if (!session) {
     res.status(401).json({ error: 'Unauthorized. Admin authentication required.' });
     return;
@@ -190,6 +218,36 @@ export async function requireAdminAuth(req: Request, res: Response, next: NextFu
 }
 
 // ─── AUTH ROUTES (STORED IN FIREBASE / SUPABASE) ──────────────────────────────
+
+apiRouter.post('/auth/local-dev-login', async (req: Request, res: Response) => {
+  if (!isLocalRequest(req)) {
+    return res.status(403).json({ error: 'Admin access is restricted to localhost.' });
+  }
+
+  const token = 'local_dev_' + crypto.randomUUID() + '_' + Date.now();
+  const session = {
+    token,
+    adminId: 'adm-local-developer',
+    username: 'local_admin',
+    displayName: 'Local Administrator',
+    role: 'ADMIN',
+    expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000,
+  };
+
+  try {
+    await supabaseDb.set(`blackhawk/sessions/${token}`, session);
+  } catch {}
+
+  res.json({
+    token,
+    admin: {
+      id: session.adminId,
+      username: session.username,
+      displayName: session.displayName,
+      role: session.role
+    }
+  });
+});
 
 apiRouter.post('/auth/login', async (req: Request, res: Response) => {
   const { username, password } = req.body;
@@ -271,7 +329,7 @@ apiRouter.post('/auth/logout', async (req: Request, res: Response) => {
 
 apiRouter.get('/auth/me', async (req: Request, res: Response) => {
   const token = getSessionToken(req);
-  const session = await verifyAdminSession(token);
+  const session = await verifyAdminSession(token, req);
   if (!session) {
     return res.status(401).json({ authenticated: false });
   }

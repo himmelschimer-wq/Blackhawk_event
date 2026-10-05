@@ -217,6 +217,22 @@ export const adminApi = {
     throw new Error('Invalid admin username or password.');
   },
 
+  async localDevLogin(): Promise<{ token: string; admin: AdminUser }> {
+    const res = await fetch('/api/auth/local-dev-login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || 'Local dev login failed. Admin access is restricted to localhost.');
+    }
+    const data = await res.json();
+    if (data && data.token) {
+      this.setToken(data.token);
+    }
+    return data;
+  },
+
   async logout(): Promise<void> {
     try {
       await fetch('/api/auth/logout', {

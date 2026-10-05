@@ -14,6 +14,28 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onExitTo
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const isLocal = typeof window !== 'undefined' && (
+    window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1' ||
+    window.location.hostname === '[::1]'
+  );
+
+  const handleLocalDevLogin = async () => {
+    sfx.playClick();
+    setError(null);
+    setLoading(true);
+    try {
+      await adminApi.localDevLogin();
+      sfx.playSuccess();
+      onLoginSuccess();
+    } catch (err: any) {
+      sfx.playError();
+      setError(err.message || 'Local development login failed.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     sfx.playClick();
@@ -57,6 +79,28 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onExitTo
             Secure database authentication required.
           </p>
         </div>
+
+        {/* Local Dev Instant Access Badge */}
+        {isLocal && (
+          <div className="p-3.5 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-center space-y-2.5">
+            <div className="flex items-center justify-center gap-1.5 text-[11px] text-emerald-400 font-semibold uppercase tracking-wider">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span>Local Dev Mode (Strictly Localhost Only)</span>
+            </div>
+            <p className="text-[11px] text-zinc-400 leading-relaxed">
+              Admin panel is restricted to your machine. Sign in instantly below or use credentials configured in your local <code className="text-zinc-300 font-mono">.env</code>.
+            </p>
+            <button
+              type="button"
+              onClick={handleLocalDevLogin}
+              disabled={loading}
+              className="w-full py-2 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer shadow-[0_0_15px_rgba(16,185,129,0.35)] disabled:opacity-50"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-200" />
+              <span>Instant Local Developer Sign-In</span>
+            </button>
+          </div>
+        )}
 
         {/* Error Alert */}
         {error && (

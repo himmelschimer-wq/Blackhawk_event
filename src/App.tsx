@@ -23,10 +23,17 @@ export function App() {
     window.location.hash.startsWith('#discord-callback')
   );
 
-  // Admin Panel Access Switch
-  // Set to false: Completely removes and blocks all ways to access the admin panel (routes, hash, hotkeys, sessions)
-  // The admin components and files remain intact in the codebase without deletion.
-  const ADMIN_ACCESS_ENABLED = false;
+  // Strictly Localhost Access Policy:
+  // Admin panel is ONLY accessible when running locally on localhost/127.0.0.1.
+  // On any deployed or public domain, access is completely blocked and wiped.
+  const isLocalhostEnv = typeof window !== 'undefined' && (
+    window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1' ||
+    window.location.hostname === '[::1]' ||
+    window.location.hostname.endsWith('.localhost')
+  );
+
+  const ADMIN_ACCESS_ENABLED = isLocalhostEnv;
 
   const [isAdminRoute, setIsAdminRoute] = useState(false);
   const [adminTab, setAdminTab] = useState<string>('dashboard');
@@ -117,14 +124,37 @@ export function App() {
       checkCurrentRouteAndAuth();
     };
 
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!ADMIN_ACCESS_ENABLED) return;
+      // Secret Admin Hotkeys: Ctrl + Shift + A or Alt + A or Ctrl + Alt + A
+      if (
+        (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'a') ||
+        (e.altKey && e.key.toLowerCase() === 'a') ||
+        (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'a')
+      ) {
+        e.preventDefault();
+        handleOpenAdmin();
+      }
+    };
+
     window.addEventListener('hashchange', handleRouteChange);
     window.addEventListener('popstate', handleRouteChange);
+    window.addEventListener('keydown', handleKeyDown);
 
     return () => {
       window.removeEventListener('hashchange', handleRouteChange);
       window.removeEventListener('popstate', handleRouteChange);
+      window.removeEventListener('keydown', handleKeyDown);
     };
-  }, []);
+  }, [ADMIN_ACCESS_ENABLED]);
+
+  const handleOpenAdmin = () => {
+    if (!ADMIN_ACCESS_ENABLED) return;
+    setIsAdminRoute(true);
+    setAdminTab('dashboard');
+    window.location.hash = '#admin/dashboard';
+    checkCurrentRouteAndAuth();
+  };
 
   const handleAuthSuccess = () => {
     if (!ADMIN_ACCESS_ENABLED) return;
@@ -313,6 +343,19 @@ export function App() {
         isOpen={isAboutModalOpen}
         onClose={() => setIsAboutModalOpen(false)}
       />
+
+      {/* Localhost-Only Floating Admin Trigger */}
+      {ADMIN_ACCESS_ENABLED && (
+        <button
+          onClick={handleOpenAdmin}
+          className="fixed bottom-4 left-4 z-50 px-3 py-1.5 rounded-full bg-[#0a0a0e]/95 border border-emerald-500/40 hover:border-emerald-400 text-emerald-300 hover:text-white text-[11px] font-mono shadow-[0_4px_25px_rgba(0,0,0,0.85)] flex items-center gap-2 transition-all cursor-pointer backdrop-blur-md active:scale-95 group"
+          title="Localhost Admin Access (Ctrl+Shift+A)"
+        >
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          <span className="font-semibold tracking-wider uppercase">Local Admin</span>
+          <span className="text-[9px] text-emerald-400/60 font-mono hidden sm:inline">(Ctrl+Shift+A)</span>
+        </button>
+      )}
     </div>
   );
 }
