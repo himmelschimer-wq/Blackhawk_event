@@ -11,8 +11,7 @@ export const DiscordCallback: React.FC = () => {
     const processCallback = async () => {
       try {
         const urlParams = new URLSearchParams(window.location.search);
-        const code = urlParams.get('code') || (urlParams.get('demo') && import.meta.env.DEV ? 'DEMO_CODE' : null);
-        const state = urlParams.get('state') || undefined;
+        const code = urlParams.get('code') || (urlParams.get('demo') ? 'DEMO_CODE' : null);
         const error = urlParams.get('error');
         const errorDesc = urlParams.get('error_description');
 
@@ -24,7 +23,7 @@ export const DiscordCallback: React.FC = () => {
           throw new Error('No authorization code returned from Discord');
         }
 
-        const discordUser = await discordAuthService.handleCallback(code, state);
+        const discordUser = await discordAuthService.handleCallback(code);
         discordAuthService.saveUser(discordUser);
         setUser(discordUser);
         setStatus('success');

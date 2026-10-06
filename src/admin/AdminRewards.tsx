@@ -62,16 +62,17 @@ export const AdminRewards: React.FC = () => {
         `Recorded ₹${ffCalculation.totalPayoutDistributed} total prize payouts for Free Fire (1v1 Outcome: ${ffChallengeOutcome})`
       );
 
-      // Attempt API sync via cookie session
+      // Attempt API sync
+      const token = localStorage.getItem('admin_token');
       await fetch('/api/events/freefire/save-payouts', {
         method: 'POST',
-        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
         },
         body: JSON.stringify(ffCalculation)
       }).catch(() => {
-        // Fallback for offline mode
+        // Fallback for offline/mock mode
       });
 
       sfx.playSuccess();

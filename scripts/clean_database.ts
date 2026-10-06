@@ -22,19 +22,16 @@ try {
 
 const SUPABASE_URL = (
   process.env.SUPABASE_URL ||
-  process.env.VITE_SUPABASE_URL
-)?.trim().replace(/\/$/, '');
+  process.env.VITE_SUPABASE_URL ||
+  'https://inwyqpxnnirfaqltzorz.supabase.co'
+).trim().replace(/\/$/, '');
 
 const SUPABASE_KEY = (
   process.env.SUPABASE_SERVICE_ROLE_KEY ||
   process.env.SUPABASE_ANON_KEY ||
-  process.env.VITE_SUPABASE_ANON_KEY
-)?.trim();
-
-if (!SUPABASE_URL || !SUPABASE_KEY) {
-  console.error('Error: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be configured in environment');
-  process.exit(1);
-}
+  process.env.VITE_SUPABASE_ANON_KEY ||
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlud3lxcHhubmlyZmFxbHR6b3J6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxMTM2NzksImV4cCI6MjA5MDY4OTY3OX0.XfVnB-9Q67o85-t7oDndvJ3T3sMbm_yvR584jU1PsmI'
+).trim();
 
 console.log('===========================================================');
 console.log(' BLACKHAWK: SUPABASE DATABASE CLEANER');

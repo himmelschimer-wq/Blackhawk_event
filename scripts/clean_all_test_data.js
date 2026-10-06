@@ -1,16 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+const SUPABASE_URL = 'https://inwyqpxnnirfaqltzorz.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlud3lxcHhubmlyZmFxbHR6b3J6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA4NzQxOTYsImV4cCI6MjEwNjQ1MDE5Nn0.Ls1fM8YlTsCJFL83vp790pw9_T7rZ686uJEs7ljxnj8';
 
-if (!SUPABASE_URL || !SUPABASE_KEY) {
-  console.error('Error: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set in environment');
-  process.exit(1);
-}
-
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
-  auth: { persistSession: false }
-});
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 async function cleanAll() {
   console.log('Cleaning database from dummy players and events...');
