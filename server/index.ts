@@ -1,6 +1,8 @@
+import './env.js';
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
+import helmet from 'helmet';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -9,115 +11,121 @@ import { apiRouter } from './api.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Safe environment loader for standalone server (.env in server/ or root)
-try {
-  if (typeof (process as any).loadEnvFile === 'function') {
-    const serverEnv = path.resolve(__dirname, '.env');
-    const parentEnv = path.resolve(__dirname, '../.env');
-    const cwdEnv = path.resolve(process.cwd(), '.env');
-
-    if (fs.existsSync(serverEnv)) {
-      (process as any).loadEnvFile(serverEnv);
-    } else if (fs.existsSync(parentEnv)) {
-      (process as any).loadEnvFile(parentEnv);
-    } else if (fs.existsSync(cwdEnv)) {
-      (process as any).loadEnvFile(cwdEnv);
-    } else {
-      (process as any).loadEnvFile();
-    }
-  }
-} catch {
-  // .env not present or already supplied by cloud provider (Docker, Render, Railway)
-}
-
 const app = express();
 const PORT = Number(process.env.PORT) || 3001;
 const HOST = process.env.HOST || '0.0.0.0';
 const NODE_ENV = process.env.NODE_ENV || 'development';
 
-// Enable trust proxy for reverse proxies (Render, Railway, Fly.io, Cloudflare, Nginx)
+// Fail startup immediately if production is missing critical credentials
+if (NODE_ENV === 'production') {
+  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.error('CRITICAL FATAL ERROR: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be configured in production!');
+    process.exit(1);
+  }
+}
+
+// Enable trust proxy for reverse proxies
 app.set('trust proxy', 1);
 
-// ─── CORS CONFIGURATION ───────────────────────────────────────────────────────
-const rawCorsOrigin = process.env.CORS_ORIGIN || process.env.FRONTEND_URL || '';
-let corsOptions: cors.CorsOptions;
-
-if (!rawCorsOrigin || rawCorsOrigin === '*' || rawCorsOrigin === 'true') {
-  // Allow all origins with credentials support in development or wildcard mode
-  corsOptions = {
-    origin: true,
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-    exposedHeaders: ['set-cookie'],
-  };
-} else {
-  // Support comma-separated list of allowed domains
-  const allowedOrigins = rawCorsOrigin.split(',').map(o => o.trim().replace(/\/$/, ''));
-  corsOptions = {
-    origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps, curl, or server-to-server)
-      if (!origin) return callback(null, true);
-      const isAllowed = allowedOrigins.some(allowed =>
-        allowed === origin || allowed === '*' || origin.endsWith(allowed.replace(/^\*?\./, ''))
-      );
-      if (isAllowed) {
-        callback(null, true);
-      } else {
-        callback(null, true); // Permissive fallback
-      }
+// ─── SECURITY HEADERS (HELMET) ────────────────────────────────────────────────
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+        styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+        fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
+        imgSrc: [
+          "'self'",
+          'data:',
+          'blob:',
+          'https://cdn.discordapp.com',
+          'https://*.dicebear.com',
+          'https://unavatar.io'
+        ],
+        connectSrc: [
+          "'self'",
+          'https://discord.com',
+          ...(process.env.SUPABASE_URL ? [process.env.SUPABASE_URL] : [])
+        ],
+        frameAncestors: ["'none'"],
+        objectSrc: ["'none'"],
+        upgradeInsecureRequests: NODE_ENV === 'production' ? [] : null,
+      },
     },
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  };
+    crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+    referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+    xContentTypeOptions: true,
+  })
+);
+
+// ─── CORS CONFIGURATION (EXPLICIT ALLOWLIST ONLY) ─────────────────────────────
+const allowedOrigins: string[] = [];
+if (process.env.CORS_ORIGIN) {
+  allowedOrigins.push(
+    ...process.env.CORS_ORIGIN.split(',')
+      .map(o => o.trim().replace(/\/$/, ''))
+      .filter(Boolean)
+  );
 }
+if (process.env.FRONTEND_URL) {
+  allowedOrigins.push(process.env.FRONTEND_URL.trim().replace(/\/$/, ''));
+}
+if (NODE_ENV !== 'production') {
+  allowedOrigins.push(
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://127.0.0.1:5173',
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:3001'
+  );
+}
+
+const corsOptions: cors.CorsOptions = {
+  origin: (origin, callback) => {
+    // Allow non-browser requests without origin header (e.g., CLI, tests, server-to-server)
+    if (!origin) return callback(null, true);
+    const normalized = origin.trim().replace(/\/$/, '');
+    if (allowedOrigins.includes(normalized)) {
+      return callback(null, true);
+    }
+    return callback(new Error(`Origin ${origin} not allowed by CORS policy`));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  exposedHeaders: ['set-cookie'],
+};
 
 app.use(cors(corsOptions));
 app.use(cookieParser());
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Reduce global request body limits to 100kb for input/DoS protection
+app.use(express.json({ limit: '100kb' }));
+app.use(express.urlencoded({ extended: true, limit: '100kb' }));
 
 // ─── HEALTH & STATUS CHECKS ──────────────────────────────────────────────────
-const startTime = Date.now();
-
+// Minimal public health check: no internal server diagnostics exposed
 app.get('/health', (_req: Request, res: Response) => {
-  res.status(200).json({
-    status: 'ok',
-    service: 'blackhawk-tournament-api',
-    uptimeSeconds: Math.floor((Date.now() - startTime) / 1000),
-    timestamp: new Date().toISOString(),
-    environment: NODE_ENV,
-    memoryUsage: process.memoryUsage(),
-  });
+  res.status(200).json({ status: 'ok' });
 });
 
-// Root API info endpoint for standalone inspection
+// Root API info endpoint
 app.get('/api', (_req: Request, res: Response) => {
   res.json({
     service: 'BlackHawk Esports Tournament API',
-    version: '1.0.0',
     status: 'online',
-    endpoints: {
-      stats: '/api/stats',
-      games: '/api/games',
-      events: '/api/events',
-      players: '/api/players',
-      leaderboard: '/api/leaderboard',
-      registrations: '/api/registrations (POST public / GET admin)',
-      auth: '/api/auth/me',
-      discordConfig: '/api/auth/discord/config',
-    },
-    health: '/health',
+    version: '1.0.0'
   });
 });
 
 // ─── MOUNT API ROUTES ────────────────────────────────────────────────────────
 app.use('/api', apiRouter);
-app.use(apiRouter);
 
 // ─── OPTIONAL FULLSTACK STATIC SERVING (IF DIST EXISTS) ──────────────────────
-// Detect if built client frontend exists (for single-container deployments)
 const possibleDistPaths = [
   path.resolve(process.cwd(), 'dist'),
   path.resolve(__dirname, '../dist'),
@@ -133,10 +141,8 @@ for (const p of possibleDistPaths) {
 }
 
 if (clientDistPath) {
-  console.log(`[BlackHawk Server] Serving static frontend from: ${clientDistPath}`);
   app.use(express.static(clientDistPath));
 
-  // Client-side routing fallback for SPA (Express 5 compatible)
   app.use((req: Request, res: Response, next: NextFunction) => {
     if (req.method === 'GET' && !req.path.startsWith('/api') && req.path !== '/health') {
       return res.sendFile(path.join(clientDistPath!, 'index.html'));
@@ -144,14 +150,10 @@ if (clientDistPath) {
     next();
   });
 } else {
-  // Pure standalone API mode fallback for root
   app.get('/', (_req: Request, res: Response) => {
     res.json({
       service: 'BlackHawk Esports API',
-      status: 'online',
-      message: 'Pure Backend API Server is active and operational.',
-      healthCheck: '/health',
-      apiOverview: '/api',
+      status: 'online'
     });
   });
 }
@@ -167,12 +169,15 @@ app.use('/api', (req: Request, res: Response) => {
 
 // ─── GLOBAL ERROR HANDLER ────────────────────────────────────────────────────
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-  console.error('[BlackHawk API Error]:', err);
+  if (err?.message && err.message.includes('CORS')) {
+    return res.status(403).json({ error: 'CORS origin denied' });
+  }
+  console.error('[BlackHawk API Error]:', err?.message || err);
   const status = err.status || err.statusCode || 500;
-  res.status(status).json({
-    error: err.message || 'Internal Server Error',
-    ...(NODE_ENV === 'development' ? { stack: err.stack } : {}),
-  });
+  const message = NODE_ENV === 'production' && status === 500
+    ? 'Internal server error'
+    : (err.message || 'Internal server error');
+  res.status(status).json({ error: message });
 });
 
 // ─── SERVER LIFECYCLE ────────────────────────────────────────────────────────
@@ -185,7 +190,6 @@ if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
     console.log(`[BlackHawk API] 🏥 Health check: http://${HOST}:${PORT}/health`);
   });
 
-  // Graceful shutdown handling
   const shutdown = (signal: string) => {
     console.log(`\n[BlackHawk API] Received ${signal}. Shutting down gracefully...`);
     if (serverInstance) {
@@ -193,7 +197,6 @@ if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
         console.log('[BlackHawk API] Closed all HTTP connections. Exiting.');
         process.exit(0);
       });
-      // Force shutdown after 10s if connections linger
       setTimeout(() => {
         console.error('[BlackHawk API] Forced shutdown due to timeout.');
         process.exit(1);

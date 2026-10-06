@@ -27,20 +27,19 @@ export const discordAuthService = {
     return res.json();
   },
 
-  // Get OAuth authorization URL
-  async getAuthUrl(redirectUri?: string): Promise<{ configured: boolean; url: string; state?: string }> {
-    const params = redirectUri ? `?redirectUri=${encodeURIComponent(redirectUri)}` : '';
-    const res = await fetch(`/api/auth/discord/url${params}`);
+  // Get OAuth authorization URL with cryptographically secure state
+  async getAuthUrl(): Promise<{ configured: boolean; url: string; state?: string }> {
+    const res = await fetch('/api/auth/discord/url');
     if (!res.ok) throw new Error('Failed to get Discord authorization URL');
     return res.json();
   },
 
-  // Exchange code for user profile
-  async handleCallback(code: string, redirectUri?: string): Promise<DiscordUser> {
+  // Exchange code + state for user profile
+  async handleCallback(code: string, state?: string): Promise<DiscordUser> {
     const res = await fetch('/api/auth/discord/callback', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code, redirectUri }),
+      body: JSON.stringify({ code, state }),
     });
 
     const data = await res.json();
@@ -50,14 +49,18 @@ export const discordAuthService = {
     return data.user;
   },
 
-  // Check server membership for a Discord ID
+  // Check server membership for a Discord ID (FAIL CLOSED)
   async checkServerMembership(userId: string): Promise<{ inServer: boolean; checked: boolean }> {
-    const res = await fetch(`/api/auth/discord/check-membership/${userId}`);
-    if (!res.ok) return { inServer: true, checked: false };
-    return res.json();
+    try {
+      const res = await fetch(`/api/auth/discord/check-membership/${encodeURIComponent(userId)}`);
+      if (!res.ok) return { inServer: false, checked: false };
+      return res.json();
+    } catch {
+      return { inServer: false, checked: false };
+    }
   },
 
-  // Stored session helpers
+  // Stored session helpers (public profile display only)
   saveUser(user: DiscordUser) {
     sessionStorage.setItem('bh_discord_user', JSON.stringify(user));
   },

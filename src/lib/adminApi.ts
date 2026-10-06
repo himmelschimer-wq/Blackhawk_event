@@ -1,7 +1,5 @@
-// BlackHawk Esports Real Database API Client & Supabase Client
+// BlackHawk Esports Real Database API Client & Hardened Auth Client
 import { supabase, isSupabaseConfigured } from './supabase';
-
-const TOKEN_KEY = 'blackhawk_admin_token';
 
 export interface AdminUser {
   id: string;
@@ -58,86 +56,53 @@ export function normalizeDbRow<T = any>(row: any): T {
   if (row.gameSpecificDetails !== undefined) normalized.gameSpecificData = row.gameSpecificDetails;
   if (row.registered_at !== undefined) normalized.registeredAt = row.registered_at;
   if (row.registeredAt !== undefined) normalized.registered_at = row.registeredAt;
-  if (!normalized.registeredAt && normalized.createdAt) normalized.registeredAt = normalized.createdAt;
-  if (!normalized.registeredAt) normalized.registeredAt = new Date().toISOString();
 
-  // Events
-  if (row.prize_pool !== undefined) normalized.prizePool = Number(row.prize_pool);
-  if (row.prizePool !== undefined) normalized.prize_pool = Number(row.prizePool);
-  if (row.max_participants !== undefined) normalized.maxParticipants = Number(row.max_participants);
-  if (row.registration_status !== undefined) normalized.registrationStatus = row.registration_status;
-  if (row.registrationStatus !== undefined) normalized.registration_status = row.registrationStatus;
-  if (row.event_status !== undefined) normalized.eventStatus = row.event_status;
-  if (row.eventStatus !== undefined) normalized.event_status = row.eventStatus;
-  if (row.general_rules !== undefined) normalized.generalRules = row.general_rules;
-  if (row.generalRules !== undefined) normalized.general_rules = row.generalRules;
-
-  // Leaderboard
-  if (row.points !== undefined) normalized.points = Number(row.points) || 0;
-  if (row.score !== undefined) normalized.score = Number(row.score) || 0;
-  if (row.wins !== undefined) normalized.wins = Number(row.wins) || 0;
-  if (row.matches !== undefined) normalized.matches = Number(row.matches) || 0;
+  // Match Results
+  if (row.total_points !== undefined) normalized.points = Number(row.total_points);
+  if (row.recorded_at !== undefined) normalized.recordedAt = row.recorded_at;
 
   return normalized as T;
 }
 
-// Local storage fallback loader for offline resilience
-function getLocalFallback<T>(table: string): T[] {
+// Offline cache helpers (only for non-sensitive presentation resilience)
+function getLocalFallback<T = any>(table: string): T[] {
   if (typeof window === 'undefined') return [];
   try {
-    const keyMap: Record<string, string> = {
-      players: 'BHT_PLAYERS',
-      registrations: 'BHT_REGISTRATIONS',
-      events: 'BHT_EVENTS',
-      games: 'BHT_GAMES',
-      leaderboard: 'BHT_LEADERBOARD',
-      match_results: 'BHT_RESULTS',
-      results: 'BHT_RESULTS'
-    };
-    const storageKey = keyMap[table];
-    if (storageKey) {
-      const item = localStorage.getItem(storageKey);
-      if (item) {
-        const parsed = JSON.parse(item);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.map(r => normalizeDbRow<T>(r));
-        }
-      }
-    }
-  } catch {}
-  return [];
+    const storageKey = `blackhawk_fallback_${table}`;
+    const item = localStorage.getItem(storageKey);
+    return item ? JSON.parse(item) : [];
+  } catch {
+    return [];
+  }
 }
 
-// Sync record into local storage cache
-function saveToLocalFallback(table: string, record: any) {
-  if (typeof window === 'undefined' || !record || !record.id) return;
+function saveToLocalFallback(table: string, record: any): void {
+  if (typeof window === 'undefined' || !record) return;
   try {
-    const keyMap: Record<string, string> = {
-      players: 'BHT_PLAYERS',
-      registrations: 'BHT_REGISTRATIONS',
-      events: 'BHT_EVENTS',
-      games: 'BHT_GAMES',
-      leaderboard: 'BHT_LEADERBOARD'
-    };
-    const storageKey = keyMap[table];
-    if (storageKey) {
-      const existingStr = localStorage.getItem(storageKey);
-      let list: any[] = existingStr ? JSON.parse(existingStr) : [];
-      const idx = list.findIndex((x: any) => x.id === record.id);
-      if (idx >= 0) {
-        list[idx] = { ...list[idx], ...record };
-      } else {
-        list.unshift(record);
-      }
-      localStorage.setItem(storageKey, JSON.stringify(list));
+    // Never cache admin credentials or audit logs in localStorage!
+    if (['admins', 'sessions', 'audit_logs', 'auditLogs'].includes(table)) return;
+
+    const storageKey = `blackhawk_fallback_${table}`;
+    const existingStr = localStorage.getItem(storageKey);
+    const list: any[] = existingStr ? JSON.parse(existingStr) : [];
+    const id = record.id || record.key;
+    const idx = list.findIndex(i => (i.id || i.key) === id);
+    if (idx >= 0) {
+      list[idx] = { ...list[idx], ...record };
+    } else {
+      list.unshift(record);
     }
+    localStorage.setItem(storageKey, JSON.stringify(list));
   } catch {}
 }
 
-// Helper to fetch from backend or fallback to direct Supabase query or localStorage
+// Fetch helper that falls back to Supabase ONLY for public spectator tables
 async function fetchWithFallback<T>(apiPath: string, supabaseTable: string, options?: RequestInit): Promise<T> {
   try {
-    const res = await fetch(apiPath, options);
+    const res = await fetch(apiPath, {
+      ...options,
+      credentials: 'include'
+    });
     const contentType = res.headers.get('content-type') || '';
     if (res.ok && contentType.includes('application/json')) {
       const data = await res.json();
@@ -147,12 +112,15 @@ async function fetchWithFallback<T>(apiPath: string, supabaseTable: string, opti
       return (data ? normalizeDbRow(data) : data) as unknown as T;
     }
   } catch {
-    // Backend API unavailable, query Supabase directly
+    // API not reachable
   }
 
-  if (isSupabaseConfigured) {
+  // Strictly allow ONLY public spectator tables to be queried directly from client Supabase
+  const publicSpectatorTables = ['games', 'events', 'leaderboard'];
+  const normalizedTable = supabaseTable === 'results' ? 'match_results' : supabaseTable === 'auditLogs' ? 'audit_logs' : supabaseTable;
+
+  if (isSupabaseConfigured && publicSpectatorTables.includes(normalizedTable)) {
     try {
-      const normalizedTable = supabaseTable === 'results' ? 'match_results' : supabaseTable === 'auditLogs' ? 'audit_logs' : supabaseTable;
       const { data, error } = await supabase.from(normalizedTable).select('*');
       if (!error && Array.isArray(data) && data.length > 0) {
         return data.map(r => normalizeDbRow(r)) as unknown as T;
@@ -160,7 +128,7 @@ async function fetchWithFallback<T>(apiPath: string, supabaseTable: string, opti
     } catch {}
   }
 
-  // Fallback to offline local storage
+  // Fallback to offline presentation cache
   const localData = getLocalFallback<any>(supabaseTable);
   if (localData.length > 0) {
     return localData as unknown as T;
@@ -170,91 +138,64 @@ async function fetchWithFallback<T>(apiPath: string, supabaseTable: string, opti
 }
 
 export const adminApi = {
-  getToken(): string | null {
-    return localStorage.getItem(TOKEN_KEY);
-  },
-
-  setToken(token: string): void {
-    localStorage.setItem(TOKEN_KEY, token);
-  },
-
-  clearToken(): void {
-    localStorage.removeItem(TOKEN_KEY);
-  },
-
   getAuthHeaders(): HeadersInit {
-    const token = this.getToken();
     return {
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {})
     };
   },
 
-  // ─── AUTH ────────────────────────────────────────────────────────────────
-  async login(username: string, password: string): Promise<{ token: string; admin: AdminUser }> {
+  // ─── AUTHENTICATION (SECURE HTTPONLY COOKIE BASED) ──────────────────────────
+  async login(username: string, password: string): Promise<{ admin: AdminUser }> {
     const cleanUser = String(username).trim();
     const rawPass = String(password).trim();
 
-    try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: cleanUser, password: rawPass })
-      });
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ username: cleanUser, password: rawPass })
+    });
 
-      const contentType = res.headers.get('content-type') || '';
-      if (res.ok && contentType.includes('application/json')) {
-        const data = await res.json();
-        if (data && data.token) {
-          this.setToken(data.token);
-          return data;
-        }
-      }
-    } catch {
-      // Backend not yet reachable or in cold start
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Invalid admin username or password.');
     }
 
-    throw new Error('Invalid admin username or password.');
+    return await res.json();
   },
 
-  async localDevLogin(): Promise<{ token: string; admin: AdminUser }> {
+  async localDevLogin(): Promise<{ admin: AdminUser }> {
     const res = await fetch('/api/auth/local-dev-login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include'
     });
     if (!res.ok) {
       const errData = await res.json().catch(() => ({}));
       throw new Error(errData.error || 'Local dev login failed. Admin access is restricted to localhost.');
     }
-    const data = await res.json();
-    if (data && data.token) {
-      this.setToken(data.token);
-    }
-    return data;
+    return await res.json();
   },
 
   async logout(): Promise<void> {
     try {
       await fetch('/api/auth/logout', {
         method: 'POST',
-        headers: this.getAuthHeaders()
+        headers: this.getAuthHeaders(),
+        credentials: 'include'
       });
     } catch {
       // ignore
-    } finally {
-      this.clearToken();
     }
   },
 
   async getMe(): Promise<{ authenticated: boolean; admin?: AdminUser }> {
-    const token = this.getToken();
-    if (!token) return { authenticated: false };
-
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 1800);
+      const timeoutId = setTimeout(() => controller.abort(), 3500);
       const res = await fetch('/api/auth/me', {
         headers: this.getAuthHeaders(),
+        credentials: 'include',
         signal: controller.signal
       });
       clearTimeout(timeoutId);
@@ -266,7 +207,6 @@ export const adminApi = {
       }
     } catch {}
 
-    this.clearToken();
     return { authenticated: false };
   },
 
@@ -274,32 +214,11 @@ export const adminApi = {
   async getStats(): Promise<any> {
     try {
       const res = await fetch('/api/stats', {
-        headers: this.getAuthHeaders()
+        headers: this.getAuthHeaders(),
+        credentials: 'include'
       });
       if (res.ok) return await res.json();
     } catch {}
-
-    if (isSupabaseConfigured) {
-      try {
-        const [p, r, e, g] = await Promise.all([
-          supabase.from('players').select('id', { count: 'exact', head: true }),
-          supabase.from('registrations').select('id', { count: 'exact', head: true }),
-          supabase.from('events').select('id, prize_pool, event_status'),
-          supabase.from('games').select('id', { count: 'exact', head: true }),
-        ]);
-        const events = e.data || [];
-        const prizeSum = events.reduce((acc, ev) => acc + (Number(ev.prize_pool) || 0), 0);
-        return {
-          totalPlayers: p.count || 0,
-          totalRegistrations: r.count || 0,
-          activeEvents: events.filter(ev => ['UPCOMING', 'LIVE', 'REGISTRATION OPEN'].includes(ev.event_status)).length,
-          completedEvents: events.filter(ev => ev.event_status === 'COMPLETED').length,
-          totalGames: g.count || 0,
-          totalPrizePool: prizeSum,
-          totalParticipants: r.count || 0
-        };
-      } catch {}
-    }
 
     const localP = getLocalFallback('players');
     const localR = getLocalFallback('registrations');
@@ -336,42 +255,21 @@ export const adminApi = {
       active: isBoolActive
     };
 
-    try {
-      const res = await fetch('/api/games', {
-        method: 'POST',
-        headers: this.getAuthHeaders(),
-        body: JSON.stringify(payload)
-      });
-      if (res.ok) {
-        const json = await res.json();
-        saveToLocalFallback('games', normalizeDbRow(json));
-        return normalizeDbRow(json);
-      }
-    } catch {}
+    const res = await fetch('/api/games', {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      credentials: 'include',
+      body: JSON.stringify(payload)
+    });
 
-    const id = data.id || `game_${Date.now()}`;
-    const normalized = normalizeDbRow({ ...payload, id });
-
-    if (isSupabaseConfigured) {
-      try {
-        await supabase.from('games').upsert({
-          id,
-          name: payload.name,
-          description: payload.description || '',
-          logo: payload.logo || '/assets/badge_bgmi.png',
-          banner: payload.banner || '/assets/official_game_bgmi.png',
-          category: payload.category || 'ESPORTS',
-          default_prize_pool: Number(payload.defaultPrizePool || payload.default_prize_pool || 0),
-          format: payload.format || 'SOLO',
-          active: isBoolActive
-        });
-      } catch (e) {
-        console.warn('Supabase createGame error:', e);
-      }
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to create game');
     }
 
-    saveToLocalFallback('games', normalized);
-    return normalized;
+    const json = await res.json();
+    saveToLocalFallback('games', normalizeDbRow(json));
+    return normalizeDbRow(json);
   },
 
   async updateGame(id: string, data: any) {
@@ -384,57 +282,36 @@ export const adminApi = {
       ...(isBoolActive !== undefined ? { active: isBoolActive } : {})
     };
 
-    try {
-      const res = await fetch(`/api/games/${id}`, {
-        method: 'PATCH',
-        headers: this.getAuthHeaders(),
-        body: JSON.stringify(payload)
-      });
-      if (res.ok) {
-        const json = await res.json();
-        saveToLocalFallback('games', normalizeDbRow(json));
-        return normalizeDbRow(json);
-      }
-    } catch {}
+    const res = await fetch(`/api/games/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: this.getAuthHeaders(),
+      credentials: 'include',
+      body: JSON.stringify(payload)
+    });
 
-    if (isSupabaseConfigured) {
-      try {
-        const dbPayload: Record<string, any> = {};
-        if (payload.name !== undefined) dbPayload.name = payload.name;
-        if (payload.description !== undefined) dbPayload.description = payload.description;
-        if (payload.logo !== undefined) dbPayload.logo = payload.logo;
-        if (payload.banner !== undefined) dbPayload.banner = payload.banner;
-        if (payload.category !== undefined) dbPayload.category = payload.category;
-        if (payload.format !== undefined) dbPayload.format = payload.format;
-        if (payload.defaultPrizePool !== undefined || payload.default_prize_pool !== undefined) {
-          dbPayload.default_prize_pool = Number(payload.defaultPrizePool || payload.default_prize_pool || 0);
-        }
-        if (isBoolActive !== undefined) dbPayload.active = isBoolActive;
-
-        await supabase.from('games').update(dbPayload).eq('id', id);
-      } catch (err) {
-        console.warn('Supabase updateGame error:', err);
-      }
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to update game');
     }
 
-    const normalized = normalizeDbRow({ id, ...payload });
-    saveToLocalFallback('games', normalized);
-    return normalized;
+    const json = await res.json();
+    saveToLocalFallback('games', normalizeDbRow(json));
+    return normalizeDbRow(json);
   },
 
   async deleteGame(id: string) {
-    try {
-      const res = await fetch(`/api/games/${id}`, {
-        method: 'DELETE',
-        headers: this.getAuthHeaders()
-      });
-      if (res.ok) return await res.json();
-    } catch {}
+    const res = await fetch(`/api/games/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: this.getAuthHeaders(),
+      credentials: 'include'
+    });
 
-    if (isSupabaseConfigured) {
-      await supabase.from('games').delete().eq('id', id);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to delete game');
     }
-    return { success: true };
+
+    return await res.json();
   },
 
   // ─── EVENTS ──────────────────────────────────────────────────────────────
@@ -449,128 +326,70 @@ export const adminApi = {
   },
 
   async createEvent(data: any) {
-    try {
-      const res = await fetch('/api/events', {
-        method: 'POST',
-        headers: this.getAuthHeaders(),
-        body: JSON.stringify(data)
-      });
-      if (res.ok) {
-        const json = await res.json();
-        saveToLocalFallback('events', normalizeDbRow(json));
-        return normalizeDbRow(json);
-      }
-    } catch {}
+    const res = await fetch('/api/events', {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      credentials: 'include',
+      body: JSON.stringify(data)
+    });
 
-    const id = data.id || `ev_${Date.now()}`;
-    const payload = normalizeDbRow({ ...data, id, createdAt: new Date().toISOString() });
-    if (isSupabaseConfigured) {
-      try {
-        await supabase.from('events').upsert({
-          id,
-          game_id: data.gameId || data.game_id,
-          game_name: data.gameName || data.game_name,
-          title: data.title,
-          description: data.description || '',
-          date: data.date,
-          time: data.time,
-          format: data.format || 'SOLO',
-          prize_pool: Number(data.prizePool || data.prize_pool || 0),
-          max_participants: Number(data.maxParticipants || data.max_participants || 100),
-          registration_status: data.registrationStatus || data.registration_status || 'OPEN',
-          event_status: data.eventStatus || data.event_status || 'REGISTRATION OPEN',
-          rules: data.rules || '',
-          general_rules: data.generalRules || data.general_rules || '',
-          banner: data.banner || ''
-        });
-      } catch (err) {
-        console.warn('Supabase createEvent error:', err);
-      }
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to create tournament event');
     }
-    saveToLocalFallback('events', payload);
-    return payload;
+
+    const json = await res.json();
+    saveToLocalFallback('events', normalizeDbRow(json));
+    return normalizeDbRow(json);
   },
 
   async updateEvent(id: string, data: any) {
-    try {
-      const res = await fetch(`/api/events/${id}`, {
-        method: 'PATCH',
-        headers: this.getAuthHeaders(),
-        body: JSON.stringify(data)
-      });
-      if (res.ok) {
-        const json = await res.json();
-        saveToLocalFallback('events', normalizeDbRow(json));
-        return normalizeDbRow(json);
-      }
-    } catch {}
+    const res = await fetch(`/api/events/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: this.getAuthHeaders(),
+      credentials: 'include',
+      body: JSON.stringify(data)
+    });
 
-    if (isSupabaseConfigured) {
-      try {
-        const dbPayload: Record<string, any> = {};
-        if (data.title !== undefined) dbPayload.title = data.title;
-        if (data.gameId !== undefined || data.game_id !== undefined) dbPayload.game_id = data.gameId || data.game_id;
-        if (data.gameName !== undefined || data.game_name !== undefined) dbPayload.game_name = data.gameName || data.game_name;
-        if (data.date !== undefined) dbPayload.date = data.date;
-        if (data.time !== undefined) dbPayload.time = data.time;
-        if (data.format !== undefined) dbPayload.format = data.format;
-        if (data.prizePool !== undefined || data.prize_pool !== undefined) dbPayload.prize_pool = Number(data.prizePool || data.prize_pool || 0);
-        if (data.maxParticipants !== undefined || data.max_participants !== undefined) dbPayload.max_participants = Number(data.maxParticipants || data.max_participants || 100);
-        if (data.registrationStatus !== undefined || data.registration_status !== undefined) dbPayload.registration_status = data.registrationStatus || data.registration_status;
-        if (data.eventStatus !== undefined || data.event_status !== undefined) dbPayload.event_status = data.eventStatus || data.event_status;
-        if (data.description !== undefined) dbPayload.description = data.description;
-        if (data.rules !== undefined) dbPayload.rules = data.rules;
-        if (data.generalRules !== undefined || data.general_rules !== undefined) dbPayload.general_rules = data.generalRules || data.general_rules;
-        if (data.banner !== undefined) dbPayload.banner = data.banner;
-
-        await supabase.from('events').update(dbPayload).eq('id', id);
-      } catch (err) {
-        console.warn('Supabase updateEvent error:', err);
-      }
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to update event');
     }
-    const normalized = normalizeDbRow({ id, ...data });
-    saveToLocalFallback('events', normalized);
-    return normalized;
+
+    const json = await res.json();
+    saveToLocalFallback('events', normalizeDbRow(json));
+    return normalizeDbRow(json);
   },
 
   async deleteEvent(id: string) {
-    try {
-      const res = await fetch(`/api/events/${id}`, {
-        method: 'DELETE',
-        headers: this.getAuthHeaders()
-      });
-      if (res.ok) return await res.json();
-    } catch {}
+    const res = await fetch(`/api/events/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: this.getAuthHeaders(),
+      credentials: 'include'
+    });
 
-    if (isSupabaseConfigured) {
-      await supabase.from('events').delete().eq('id', id);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to delete event');
     }
-    return { success: true };
+
+    return await res.json();
   },
 
-  async cleanDatabase(options?: { cleanEvents?: boolean; cleanRegistrations?: boolean; cleanResults?: boolean; cleanLeaderboard?: boolean }) {
-    try {
-      const res = await fetch('/api/admin/clean-database', {
-        method: 'POST',
-        headers: this.getAuthHeaders(),
-        body: JSON.stringify(options || {})
-      });
-      if (res.ok) return await res.json();
-    } catch {}
+  async cleanDatabase(options?: { cleanEvents?: boolean; cleanRegistrations?: boolean; cleanResults?: boolean; cleanLeaderboard?: boolean; confirm?: string }) {
+    const res = await fetch('/api/admin/clean-database', {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      credentials: 'include',
+      body: JSON.stringify(options || {})
+    });
 
-    if (isSupabaseConfigured) {
-      if (options?.cleanEvents !== false) await supabase.from('events').delete().neq('id', 'dummy_preserved_id');
-      if (options?.cleanRegistrations !== false) await supabase.from('registrations').delete().neq('id', 'dummy_preserved_id');
-      if (options?.cleanResults !== false) await supabase.from('match_results').delete().neq('id', 'dummy_preserved_id');
-      if (options?.cleanLeaderboard !== false) await supabase.from('leaderboard').delete().neq('id', 'dummy_preserved_id');
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to clean database');
     }
 
-    if (options?.cleanEvents !== false) localStorage.removeItem('blackhawk_fallback_events');
-    if (options?.cleanRegistrations !== false) localStorage.removeItem('blackhawk_fallback_registrations');
-    if (options?.cleanResults !== false) localStorage.removeItem('blackhawk_fallback_results');
-    if (options?.cleanLeaderboard !== false) localStorage.removeItem('blackhawk_fallback_leaderboard');
-
-    return { success: true };
+    return await res.json();
   },
 
   // ─── PLAYERS ─────────────────────────────────────────────────────────────
@@ -587,114 +406,58 @@ export const adminApi = {
       { headers: this.getAuthHeaders() }
     );
     if (!Array.isArray(players)) return [];
-    let filtered = players;
-    if (params?.game && params.game !== 'ALL') {
-      filtered = filtered.filter(p => (p.game || '').toLowerCase() === params.game?.toLowerCase());
-    }
-    if (params?.status && params.status !== 'ALL') {
-      filtered = filtered.filter(p => p.status === params.status);
-    }
-    if (params?.search) {
-      const s = params.search.toLowerCase();
-      filtered = filtered.filter(p => 
-        (p.fullName || p.full_name || '').toLowerCase().includes(s) || 
-        (p.gamerTag || p.gamer_tag || '').toLowerCase().includes(s) ||
-        (p.discordUsername || p.discord_username || '').toLowerCase().includes(s)
-      );
-    }
-    return filtered;
+    return players;
   },
 
   async createPlayer(data: any) {
-    try {
-      const res = await fetch('/api/players', {
-        method: 'POST',
-        headers: this.getAuthHeaders(),
-        body: JSON.stringify(data)
-      });
-      if (res.ok) {
-        const json = await res.json();
-        saveToLocalFallback('players', normalizeDbRow(json));
-        return normalizeDbRow(json);
-      }
-    } catch {}
+    const res = await fetch('/api/players', {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      credentials: 'include',
+      body: JSON.stringify(data)
+    });
 
-    const cleanTag = (data.gamerTag || data.gamer_tag || '').trim();
-    const existingPlayers = getLocalFallback<any>('players');
-    const existing = existingPlayers.find((p: any) => (p.gamerTag || p.gamer_tag || '').trim().toLowerCase() === cleanTag.toLowerCase());
-
-    const id = data.id || existing?.id || `ply_${Date.now()}`;
-    const payload = normalizeDbRow({ ...existing, ...data, id, createdAt: existing?.createdAt || new Date().toISOString() });
-    if (isSupabaseConfigured) {
-      try {
-        await supabase.from('players').upsert({
-          id,
-          full_name: data.fullName || data.full_name,
-          gamer_tag: data.gamerTag || data.gamer_tag,
-          discord_username: data.discordUsername || data.discord_username || 'N/A',
-          email: data.email || '',
-          phone: data.phone || '',
-          game: data.game || 'ALL',
-          team: data.team || '',
-          status: data.status || 'ACTIVE'
-        });
-      } catch (err) {
-        console.warn('Supabase createPlayer error:', err);
-      }
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to create player');
     }
-    saveToLocalFallback('players', payload);
-    return payload;
+
+    const json = await res.json();
+    saveToLocalFallback('players', normalizeDbRow(json));
+    return normalizeDbRow(json);
   },
 
   async updatePlayer(id: string, data: any) {
-    try {
-      const res = await fetch(`/api/players/${id}`, {
-        method: 'PATCH',
-        headers: this.getAuthHeaders(),
-        body: JSON.stringify(data)
-      });
-      if (res.ok) {
-        const json = await res.json();
-        saveToLocalFallback('players', normalizeDbRow(json));
-        return normalizeDbRow(json);
-      }
-    } catch {}
+    const res = await fetch(`/api/players/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: this.getAuthHeaders(),
+      credentials: 'include',
+      body: JSON.stringify(data)
+    });
 
-    if (isSupabaseConfigured) {
-      try {
-        const dbPayload: Record<string, any> = {};
-        if (data.fullName !== undefined || data.full_name !== undefined) dbPayload.full_name = data.fullName || data.full_name;
-        if (data.gamerTag !== undefined || data.gamer_tag !== undefined) dbPayload.gamer_tag = data.gamerTag || data.gamer_tag;
-        if (data.discordUsername !== undefined || data.discord_username !== undefined) dbPayload.discord_username = data.discordUsername || data.discord_username;
-        if (data.email !== undefined) dbPayload.email = data.email;
-        if (data.phone !== undefined) dbPayload.phone = data.phone;
-        if (data.game !== undefined) dbPayload.game = data.game;
-        if (data.team !== undefined) dbPayload.team = data.team;
-        if (data.status !== undefined) dbPayload.status = data.status;
-
-        await supabase.from('players').update(dbPayload).eq('id', id);
-      } catch (err) {
-        console.warn('Supabase updatePlayer error:', err);
-      }
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to update player');
     }
-    const normalized = normalizeDbRow({ id, ...data });
-    saveToLocalFallback('players', normalized);
-    return normalized;
+
+    const json = await res.json();
+    saveToLocalFallback('players', normalizeDbRow(json));
+    return normalizeDbRow(json);
   },
 
   async deletePlayer(id: string) {
-    try {
-      const res = await fetch(`/api/players/${id}`, {
-        method: 'DELETE',
-        headers: this.getAuthHeaders()
-      });
-      if (res.ok) return await res.json();
-    } catch {}
+    const res = await fetch(`/api/players/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: this.getAuthHeaders(),
+      credentials: 'include'
+    });
 
-    if (isSupabaseConfigured) {
-      await supabase.from('players').delete().eq('id', id);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to delete player');
     }
-    return { success: true };
+
+    return await res.json();
   },
 
   // ─── LEADERBOARD ─────────────────────────────────────────────────────────
@@ -702,110 +465,79 @@ export const adminApi = {
     const url = game && game !== 'ALL' ? `/api/leaderboard?game=${encodeURIComponent(game)}` : '/api/leaderboard';
     const leaderboard = await fetchWithFallback<any[]>(url, 'leaderboard', { headers: this.getAuthHeaders() });
     if (!Array.isArray(leaderboard)) return [];
-
-    // Strict unique filter by gamer tag
-    const seen = new Set<string>();
-    const deduplicated = leaderboard.filter(l => {
-      const tag = (l.gamerTag || l.gamer_tag || l.playerName || '').trim().toLowerCase();
-      if (!tag || seen.has(tag)) return false;
-      seen.add(tag);
-      return true;
-    });
-
-    if (game && game !== 'ALL') {
-      return deduplicated.filter(l => (l.game || '').toLowerCase() === game.toLowerCase() || (l.game || '').toLowerCase() === 'all');
-    }
-    return deduplicated;
+    return leaderboard;
   },
 
   async updateLeaderboard(id: string, data: any) {
-    try {
-      const res = await fetch(`/api/leaderboard/${id}`, {
-        method: 'PATCH',
-        headers: this.getAuthHeaders(),
-        body: JSON.stringify(data)
-      });
-      if (res.ok) return await res.json();
-    } catch {}
+    const res = await fetch(`/api/leaderboard/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: this.getAuthHeaders(),
+      credentials: 'include',
+      body: JSON.stringify(data)
+    });
 
-    if (isSupabaseConfigured) {
-      await supabase.from('leaderboard').update(data).eq('id', id);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to update leaderboard entry');
     }
-    return { id, ...data };
+
+    return await res.json();
   },
 
   async createLeaderboardEntry(data: any) {
-    try {
-      const res = await fetch('/api/leaderboard', {
-        method: 'POST',
-        headers: this.getAuthHeaders(),
-        body: JSON.stringify(data)
-      });
-      if (res.ok) {
-        const json = await res.json();
-        saveToLocalFallback('leaderboard', normalizeDbRow(json));
-        return normalizeDbRow(json);
-      }
-    } catch {}
+    const res = await fetch('/api/leaderboard', {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      credentials: 'include',
+      body: JSON.stringify(data)
+    });
 
-    const cleanTag = (data.gamerTag || data.gamer_tag || '').trim();
-    const existingLb = getLocalFallback<any>('leaderboard');
-    const existing = existingLb.find((l: any) => (l.gamerTag || l.gamer_tag || '').trim().toLowerCase() === cleanTag.toLowerCase());
-
-    const id = data.id || existing?.id || `lb_${Date.now()}`;
-    const normalized = normalizeDbRow({ ...existing, ...data, id });
-
-    if (isSupabaseConfigured) {
-      try {
-        await supabase.from('leaderboard').upsert({
-          id,
-          player_id: data.playerId || data.player_id || existing?.playerId || `ply_${Date.now()}`,
-          player_name: data.playerName || data.player_name,
-          gamer_tag: data.gamerTag || data.gamer_tag,
-          discord_username: data.discordUsername || data.discord_username || 'N/A',
-          game: data.game || 'ALL',
-          points: Number(data.points) || 0,
-          wins: Number(data.wins) || 0,
-          matches: Number(data.matches) || 0,
-          score: Number(data.score) || 0,
-          avatar: data.avatar || ''
-        });
-      } catch (e) {
-        console.warn('Supabase createLeaderboardEntry error:', e);
-      }
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to create leaderboard entry');
     }
-    saveToLocalFallback('leaderboard', normalized);
-    return normalized;
+
+    const json = await res.json();
+    saveToLocalFallback('leaderboard', normalizeDbRow(json));
+    return normalizeDbRow(json);
   },
 
-  async resetLeaderboard(id: string) {
-    try {
-      const res = await fetch(`/api/leaderboard/${id}/reset`, {
-        method: 'POST',
-        headers: this.getAuthHeaders()
-      });
-      if (res.ok) return await res.json();
-    } catch {}
+  async deleteLeaderboardEntry(id: string) {
+    const res = await fetch(`/api/leaderboard/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: this.getAuthHeaders(),
+      credentials: 'include'
+    });
 
-    if (isSupabaseConfigured) {
-      await supabase.from('leaderboard').update({ points: 0, score: 0, wins: 0, matches: 0 }).eq('id', id);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to delete leaderboard entry');
     }
-    return { success: true };
+
+    return await res.json();
   },
 
   async deleteLeaderboard(id: string) {
-    try {
-      const res = await fetch(`/api/leaderboard/${id}`, {
-        method: 'DELETE',
-        headers: this.getAuthHeaders()
-      });
-      if (res.ok) return await res.json();
-    } catch {}
+    return this.deleteLeaderboardEntry(id);
+  },
 
-    if (isSupabaseConfigured) {
-      await supabase.from('leaderboard').delete().eq('id', id);
+  async resetLeaderboardEntry(id: string) {
+    const res = await fetch(`/api/leaderboard/${encodeURIComponent(id)}/reset`, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      credentials: 'include'
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to reset leaderboard entry');
     }
-    return { success: true };
+
+    return await res.json();
+  },
+
+  async resetLeaderboard(id: string) {
+    return this.resetLeaderboardEntry(id);
   },
 
   async recordMatchScore(payload: {
@@ -822,30 +554,19 @@ export const adminApi = {
     breakdown?: any;
     notes?: string;
   }) {
-    try {
-      const res = await fetch('/api/leaderboard/record-match', {
-        method: 'POST',
-        headers: this.getAuthHeaders(),
-        body: JSON.stringify(payload)
-      });
-      if (res.ok) return await res.json();
-    } catch {}
+    const res = await fetch('/api/leaderboard/record-match', {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      credentials: 'include',
+      body: JSON.stringify(payload)
+    });
 
-    const matchId = `match_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-    if (isSupabaseConfigured) {
-      await supabase.from('match_results').upsert({
-        id: matchId,
-        player_id: payload.playerId,
-        player_name: payload.playerName,
-        gamer_tag: payload.gamerTag,
-        game_name: payload.game,
-        event_id: payload.eventId,
-        total_points: payload.points,
-        placement: payload.placement,
-        recorded_at: new Date().toISOString()
-      });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to record authoritative match score');
     }
-    return { success: true, matchId };
+
+    return await res.json();
   },
 
   // ─── REGISTRATIONS ───────────────────────────────────────────────────────
@@ -856,219 +577,129 @@ export const adminApi = {
     if (params?.search) q.set('search', params.search);
 
     const qs = q.toString() ? `?${q.toString()}` : '';
-    const list = await fetchWithFallback<any[]>(
-      `/api/registrations${qs}`,
-      'registrations',
-      { headers: this.getAuthHeaders() }
-    );
-    if (!Array.isArray(list)) return [];
-    let filtered = list;
-    if (params?.game && params.game !== 'ALL') {
-      filtered = filtered.filter(r => (r.gameId || r.game_id || r.gameName || r.game_name || '').toLowerCase() === params.game?.toLowerCase());
-    }
-    if (params?.status && params.status !== 'ALL') {
-      filtered = filtered.filter(r => r.status === params.status);
-    }
-    if (params?.search) {
-      const s = params.search.toLowerCase();
-      filtered = filtered.filter(r => 
-        (r.playerName || r.player_name || '').toLowerCase().includes(s) || 
-        (r.gamerTag || r.gamer_tag || '').toLowerCase().includes(s) ||
-        (r.id || '').toLowerCase().includes(s)
-      );
+    const res = await fetch(`/api/registrations${qs}`, {
+      headers: this.getAuthHeaders(),
+      credentials: 'include'
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to load registrations');
     }
 
-    // Deduplicate strictly: exactly ONE registration per player per game
-    const uniqueMap = new Map<string, any>();
-    for (const r of filtered) {
-      const tag = (r.gamerTag || r.gamer_tag || '').trim().toLowerCase();
-      const gId = (r.gameId || r.game_id || r.gameName || r.game_name || 'freefire').toLowerCase();
-      const key = `${tag}_${gId}`;
-      if (!uniqueMap.has(key)) {
-        uniqueMap.set(key, r);
-      } else {
-        const existing = uniqueMap.get(key)!;
-        const rHasEvent = Boolean((r.eventId || r.event_id) && (r.eventId || r.event_id) !== 'null');
-        const exHasEvent = Boolean((existing.eventId || existing.event_id) && (existing.eventId || existing.event_id) !== 'null');
-        if (rHasEvent && !exHasEvent) {
-          uniqueMap.set(key, r);
-        }
-      }
-    }
-
-    return Array.from(uniqueMap.values());
+    const list = await res.json();
+    return Array.isArray(list) ? list.map(normalizeDbRow) : [];
   },
 
   async submitRegistration(data: any) {
-    try {
-      const res = await fetch('/api/registrations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-      });
-      if (res.ok) {
-        const json = await res.json();
-        if (json.player) saveToLocalFallback('players', normalizeDbRow(json.player));
-        if (Array.isArray(json.registrations)) {
-          json.registrations.forEach((r: any) => saveToLocalFallback('registrations', normalizeDbRow(r)));
-        }
-        return json;
-      }
-    } catch {}
-
-    // Fallback registration handler
-    const cleanTag = (data.gamerTag || '').trim();
-    const existingPlayers = getLocalFallback<any>('players');
-    const existingPlayer = existingPlayers.find((p: any) => (p.gamerTag || p.gamer_tag || '').trim().toLowerCase() === cleanTag.toLowerCase());
-
-    const playerId = existingPlayer ? existingPlayer.id : `ply-${Date.now().toString(36)}`;
-    const registeredAt = new Date().toISOString();
-
-    const player = normalizeDbRow({
-      id: playerId,
-      fullName: data.fullName || data.gamerTag,
-      gamerTag: cleanTag,
-      discordUsername: data.discordUsername || 'N/A',
-      game: data.games?.[0]?.gameName || 'ALL',
-      status: 'ACTIVE',
-      createdAt: existingPlayer?.createdAt || registeredAt
+    const res = await fetch('/api/registrations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(data)
     });
 
-    const registrationsList: any[] = [];
-    const gamesList = Array.isArray(data.games) ? data.games : [data];
-
-    for (const g of gamesList) {
-      const gRegId = `BHL-${Math.floor(100000 + Math.random() * 900000)}`;
-      const payload = normalizeDbRow({
-        id: gRegId,
-        playerId,
-        playerName: data.fullName || data.gamerTag,
-        gamerTag: data.gamerTag,
-        discordUsername: data.discordUsername || 'N/A',
-        gameId: g.gameId || 'bgmi',
-        gameName: g.gameName || 'BGMI',
-        eventId: g.eventId || null,
-        eventTitle: g.eventTitle || null,
-        teamName: g.teamName || null,
-        teamMembers: g.teamMembers || null,
-        gameSpecificData: g.gameSpecificDetails || g.gameSpecificData || {},
-        status: 'REGISTERED',
-        registeredAt
-      });
-
-      if (isSupabaseConfigured) {
-        try {
-          await supabase.from('registrations').upsert({
-            id: gRegId,
-            player_id: playerId,
-            player_name: payload.playerName,
-            gamer_tag: payload.gamerTag,
-            discord_username: payload.discordUsername,
-            game_id: payload.gameId,
-            game_name: payload.gameName,
-            event_id: payload.eventId,
-            event_title: payload.eventTitle,
-            team_name: payload.teamName,
-            team_members: payload.teamMembers,
-            game_specific_details: payload.gameSpecificData,
-            status: 'REGISTERED',
-            registered_at: registeredAt
-          });
-        } catch (e) {
-          console.warn('Supabase reg insert fallback error:', e);
-        }
-      }
-
-      saveToLocalFallback('registrations', payload);
-      registrationsList.push(payload);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Registration failed.');
     }
 
-    saveToLocalFallback('players', player);
-
-    return {
-      player,
-      registrations: registrationsList
-    };
+    const json = await res.json();
+    return json;
   },
 
   async updateRegistrationStatus(id: string, status: string) {
-    try {
-      const res = await fetch(`/api/registrations/${id}`, {
-        method: 'PATCH',
-        headers: this.getAuthHeaders(),
-        body: JSON.stringify({ status })
-      });
-      if (res.ok) {
-        const json = await res.json();
-        saveToLocalFallback('registrations', normalizeDbRow(json));
-        return normalizeDbRow(json);
-      }
-    } catch {}
+    const res = await fetch(`/api/registrations/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: this.getAuthHeaders(),
+      credentials: 'include',
+      body: JSON.stringify({ status })
+    });
 
-    if (isSupabaseConfigured) {
-      try {
-        await supabase.from('registrations').update({ status }).eq('id', id);
-      } catch (err) {
-        console.warn('Supabase updateRegistrationStatus error:', err);
-      }
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to update registration status');
     }
-    const normalized = normalizeDbRow({ id, status });
-    saveToLocalFallback('registrations', normalized);
-    return normalized;
+
+    const json = await res.json();
+    saveToLocalFallback('registrations', normalizeDbRow(json));
+    return normalizeDbRow(json);
   },
 
   async deleteRegistration(id: string) {
-    try {
-      const res = await fetch(`/api/registrations/${id}`, {
-        method: 'DELETE',
-        headers: this.getAuthHeaders()
-      });
-      if (res.ok) return await res.json();
-    } catch {}
+    const res = await fetch(`/api/registrations/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: this.getAuthHeaders(),
+      credentials: 'include'
+    });
 
-    if (isSupabaseConfigured) {
-      await supabase.from('registrations').delete().eq('id', id);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to delete registration');
     }
-    return { success: true };
+
+    return await res.json();
   },
 
   // ─── DATABASE EXPLORER ───────────────────────────────────────────────────
   async getDatabaseTable(table: string): Promise<any[]> {
-    const res = await fetchWithFallback<any[]>(
-      `/api/database/${table}`,
-      table,
-      { headers: this.getAuthHeaders() }
-    );
-    return Array.isArray(res) ? res : [];
+    const res = await fetch(`/api/database/${encodeURIComponent(table)}`, {
+      headers: this.getAuthHeaders(),
+      credentials: 'include'
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `Failed to fetch table ${table}`);
+    }
+
+    const data = await res.json();
+    return Array.isArray(data) ? data.map(normalizeDbRow) : [];
   },
 
   async deleteDatabaseRow(table: string, id: string) {
-    try {
-      const res = await fetch(`/api/database/${table}/${id}`, {
-        method: 'DELETE',
-        headers: this.getAuthHeaders()
-      });
-      if (res.ok) return await res.json();
-    } catch {}
+    const res = await fetch(`/api/database/${encodeURIComponent(table)}/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: this.getAuthHeaders(),
+      credentials: 'include'
+    });
 
-    if (isSupabaseConfigured) {
-      await supabase.from(table).delete().eq('id', id);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to delete record');
     }
-    return { success: true };
+
+    return await res.json();
   },
 
   async syncDatabase(): Promise<{ success: boolean; message?: string; error?: string }> {
-    try {
-      const res = await fetch('/api/database/sync', {
-        method: 'POST',
-        headers: this.getAuthHeaders()
-      });
-      if (res.ok) {
-        return await res.json();
-      }
-    } catch {}
+    const res = await fetch('/api/database/sync', {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      credentials: 'include'
+    });
 
-    return { success: true, message: 'Database synchronized directly.' };
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to synchronize database');
+    }
+
+    return await res.json();
+  },
+
+  async saveFreeFirePayouts(calculation: any) {
+    const res = await fetch('/api/events/freefire/save-payouts', {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      credentials: 'include',
+      body: JSON.stringify(calculation)
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to save Free Fire prize payouts');
+    }
+
+    return await res.json();
   }
 };
-

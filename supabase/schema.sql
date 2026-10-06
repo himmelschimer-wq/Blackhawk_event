@@ -1,16 +1,16 @@
 -- ==============================================================================
--- BLACKHAWK ESPORTS TOURNAMENT PLATFORM - SUPABASE POSTGRESQL SCHEMA
+-- BLACKHAWK ESPORTS TOURNAMENT PLATFORM - PRODUCTION HARDENED SCHEMA
 -- ==============================================================================
--- Run this script directly in your Supabase SQL Editor:
+-- Run this script in the Supabase SQL Editor:
 -- https://supabase.com/dashboard/project/_/sql
 
 -- 1. EXTENSIONS
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
--- 2. ADMINS TABLE
+-- 2. ADMINS TABLE (CRITICAL SENSITIVE - NO ANONYMOUS ACCESS)
 CREATE TABLE IF NOT EXISTS public.admins (
-    id TEXT PRIMARY KEY DEFAULT ('adm-' || extract(epoch from now())::bigint),
+    id TEXT PRIMARY KEY DEFAULT ('adm-' || encode(gen_random_bytes(8), 'hex')),
     username TEXT UNIQUE NOT NULL,
     display_name TEXT NOT NULL DEFAULT 'BlackHawk Admin',
     password_hash TEXT NOT NULL,
@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS public.admins (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- 3. SESSIONS TABLE
+-- 3. SESSIONS TABLE (CRITICAL SENSITIVE - NO ANONYMOUS ACCESS)
 CREATE TABLE IF NOT EXISTS public.sessions (
     token TEXT PRIMARY KEY,
     admin_id TEXT NOT NULL REFERENCES public.admins(id) ON DELETE CASCADE,
@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS public.sessions (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- 4. GAMES TABLE
+-- 4. GAMES TABLE (PUBLIC READABLE CATALOG)
 CREATE TABLE IF NOT EXISTS public.games (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
@@ -34,15 +34,15 @@ CREATE TABLE IF NOT EXISTS public.games (
     logo TEXT,
     banner TEXT,
     category TEXT,
-    default_prize_pool NUMERIC NOT NULL DEFAULT 0,
+    default_prize_pool NUMERIC NOT NULL DEFAULT 0 CHECK (default_prize_pool >= 0),
     format TEXT NOT NULL DEFAULT 'SOLO',
     active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- 5. EVENTS TABLE
+-- 5. EVENTS TABLE (PUBLIC READABLE TOURNAMENTS)
 CREATE TABLE IF NOT EXISTS public.events (
-    id TEXT PRIMARY KEY DEFAULT ('ev-' || substr(md5(random()::text), 1, 8)),
+    id TEXT PRIMARY KEY DEFAULT ('ev-' || encode(gen_random_bytes(8), 'hex')),
     game_id TEXT NOT NULL REFERENCES public.games(id) ON DELETE CASCADE,
     game_name TEXT NOT NULL,
     title TEXT NOT NULL,
@@ -50,8 +50,8 @@ CREATE TABLE IF NOT EXISTS public.events (
     date TEXT NOT NULL,
     time TEXT NOT NULL,
     format TEXT NOT NULL DEFAULT 'SOLO',
-    prize_pool NUMERIC NOT NULL DEFAULT 0,
-    max_participants INTEGER NOT NULL DEFAULT 100,
+    prize_pool NUMERIC NOT NULL DEFAULT 0 CHECK (prize_pool >= 0),
+    max_participants INTEGER NOT NULL DEFAULT 100 CHECK (max_participants > 0),
     registration_status TEXT NOT NULL DEFAULT 'OPEN' CHECK (registration_status IN ('OPEN', 'CLOSED')),
     event_status TEXT NOT NULL DEFAULT 'REGISTRATION OPEN' CHECK (event_status IN ('UPCOMING', 'REGISTRATION OPEN', 'LIVE', 'COMPLETED', 'ARCHIVED', 'CANCELLED')),
     rules TEXT,
@@ -62,12 +62,12 @@ CREATE TABLE IF NOT EXISTS public.events (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- 6. PLAYERS TABLE
+-- 6. PLAYERS TABLE (SENSITIVE PII - ACCESS VIA AUTHENTICATED API ONLY)
 CREATE TABLE IF NOT EXISTS public.players (
-    id TEXT PRIMARY KEY DEFAULT ('ply-' || substr(md5(random()::text), 1, 8)),
+    id TEXT PRIMARY KEY DEFAULT ('ply-' || encode(gen_random_bytes(8), 'hex')),
     full_name TEXT NOT NULL,
-    gamer_tag TEXT UNIQUE NOT NULL,
-    discord_username TEXT NOT NULL,
+    gamer_tag TEXT NOT NULL,
+    discord_username TEXT NOT NULL DEFAULT 'N/A',
     email TEXT DEFAULT '',
     phone TEXT DEFAULT '',
     game TEXT NOT NULL DEFAULT 'ALL',
@@ -77,31 +77,31 @@ CREATE TABLE IF NOT EXISTS public.players (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- 7. LEADERBOARD TABLE
+-- 7. LEADERBOARD TABLE (PUBLIC SPECTATOR READABLE)
 CREATE TABLE IF NOT EXISTS public.leaderboard (
-    id TEXT PRIMARY KEY DEFAULT ('lb-' || substr(md5(random()::text), 1, 8)),
+    id TEXT PRIMARY KEY DEFAULT ('lb-' || encode(gen_random_bytes(8), 'hex')),
     player_id TEXT NOT NULL,
     player_name TEXT NOT NULL,
     gamer_tag TEXT NOT NULL,
-    discord_username TEXT NOT NULL,
+    discord_username TEXT NOT NULL DEFAULT 'N/A',
     game TEXT NOT NULL DEFAULT 'ALL',
-    points NUMERIC NOT NULL DEFAULT 0,
-    score NUMERIC NOT NULL DEFAULT 0,
-    wins INTEGER NOT NULL DEFAULT 0,
-    matches INTEGER NOT NULL DEFAULT 0,
-    rank INTEGER DEFAULT 1,
+    points NUMERIC NOT NULL DEFAULT 0 CHECK (points >= 0),
+    score NUMERIC NOT NULL DEFAULT 0 CHECK (score >= 0),
+    wins INTEGER NOT NULL DEFAULT 0 CHECK (wins >= 0),
+    matches INTEGER NOT NULL DEFAULT 0 CHECK (matches >= 0),
+    rank INTEGER DEFAULT 1 CHECK (rank >= 1),
     avatar TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- 8. REGISTRATIONS TABLE
+-- 8. REGISTRATIONS TABLE (SENSITIVE PII - SERVER-CONTROLLED MUTATION)
 CREATE TABLE IF NOT EXISTS public.registrations (
-    id TEXT PRIMARY KEY DEFAULT ('BHL-' || floor(100000 + random() * 900000)::text),
+    id TEXT PRIMARY KEY DEFAULT ('BHL-' || upper(substr(encode(gen_random_bytes(4), 'hex'), 1, 8))),
     player_id TEXT,
     player_name TEXT NOT NULL,
     gamer_tag TEXT NOT NULL,
-    discord_username TEXT NOT NULL,
+    discord_username TEXT NOT NULL DEFAULT 'N/A',
     email TEXT DEFAULT '',
     phone TEXT DEFAULT '',
     game_id TEXT NOT NULL,
@@ -118,67 +118,68 @@ CREATE TABLE IF NOT EXISTS public.registrations (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- 9. MATCH RESULTS / SCORES TABLE
+-- 9. MATCH RESULTS / SCORES TABLE (PRIVILEGED TOURNAMENT DATA)
 CREATE TABLE IF NOT EXISTS public.match_results (
-    id TEXT PRIMARY KEY DEFAULT ('res-' || substr(md5(random()::text), 1, 8)),
+    id TEXT PRIMARY KEY DEFAULT ('res-' || encode(gen_random_bytes(8), 'hex')),
     event_id TEXT,
     game_name TEXT NOT NULL,
     week TEXT,
     player_id TEXT NOT NULL,
     player_name TEXT NOT NULL,
     gamer_tag TEXT NOT NULL,
-    placement INTEGER,
+    placement INTEGER CHECK (placement IS NULL OR placement >= 0),
     participated BOOLEAN NOT NULL DEFAULT TRUE,
     challenge_winner BOOLEAN NOT NULL DEFAULT FALSE,
     rising_star BOOLEAN NOT NULL DEFAULT FALSE,
     points JSONB DEFAULT '{}'::jsonb,
-    total_points NUMERIC NOT NULL DEFAULT 0,
+    total_points NUMERIC NOT NULL DEFAULT 0 CHECK (total_points >= 0),
     status TEXT NOT NULL DEFAULT 'DRAFT' CHECK (status IN ('DRAFT', 'REVIEW', 'PUBLISHED')),
     published_at TIMESTAMPTZ,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     recorded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- 10. DRAWS TABLE (Participation Lucky Draws)
+-- 10. DRAWS TABLE (PRIVILEGED LUCKY DRAWS)
 CREATE TABLE IF NOT EXISTS public.draws (
-    id TEXT PRIMARY KEY DEFAULT ('draw-' || substr(md5(random()::text), 1, 8)),
+    id TEXT PRIMARY KEY DEFAULT ('draw-' || encode(gen_random_bytes(8), 'hex')),
     event_id TEXT,
     game_name TEXT NOT NULL,
     week TEXT,
     winner_player_id TEXT NOT NULL,
     winner_name TEXT NOT NULL,
     winner_tag TEXT NOT NULL,
-    reward_amount NUMERIC NOT NULL DEFAULT 25,
-    eligible_count INTEGER NOT NULL DEFAULT 0,
+    reward_amount NUMERIC NOT NULL DEFAULT 25 CHECK (reward_amount >= 0),
+    eligible_count INTEGER NOT NULL DEFAULT 0 CHECK (eligible_count >= 0),
     conducted_by TEXT NOT NULL DEFAULT 'Admin',
     drawn_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- 11. AUDIT LOGS TABLE
+-- 11. AUDIT LOGS TABLE (HIGH SECURITY SENSITIVE - SERVER EXCLUSIVE)
 CREATE TABLE IF NOT EXISTS public.audit_logs (
-    id TEXT PRIMARY KEY DEFAULT ('log-' || substr(md5(random()::text), 1, 8)),
+    id TEXT PRIMARY KEY DEFAULT ('log-' || encode(gen_random_bytes(8), 'hex')),
     admin_user TEXT NOT NULL,
-    role TEXT NOT NULL DEFAULT 'ADMIN',
+    role TEXT NOT NULL DEFAULT 'ADMIN' CHECK (role IN ('ADMIN', 'ORGANIZER', 'VIEWER')),
     action TEXT NOT NULL,
     target_entity TEXT NOT NULL,
     target_id TEXT NOT NULL,
     old_value TEXT,
     new_value TEXT,
+    ip_address TEXT,
     timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- 12. PAYOUTS TABLE
+-- 12. PAYOUTS TABLE (FINANCIAL SENSITIVE - SERVER EXCLUSIVE)
 CREATE TABLE IF NOT EXISTS public.payouts (
     id TEXT PRIMARY KEY,
     event_id TEXT NOT NULL,
-    total_payout NUMERIC NOT NULL DEFAULT 0,
+    total_payout NUMERIC NOT NULL DEFAULT 0 CHECK (total_payout >= 0),
     winners_json JSONB DEFAULT '[]'::jsonb,
     calculations_json JSONB DEFAULT '{}'::jsonb,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- 13. SYSTEM SETTINGS / REWARDS CONFIG
+-- 13. SYSTEM SETTINGS TABLE (PRIVILEGED CONFIGURATION)
 CREATE TABLE IF NOT EXISTS public.system_settings (
     key TEXT PRIMARY KEY,
     value JSONB NOT NULL,
@@ -186,12 +187,12 @@ CREATE TABLE IF NOT EXISTS public.system_settings (
 );
 
 -- ==============================================================================
--- INDEXES FOR ULTRA-FAST PERFORMANCE
+-- DATABASE CONSTRAINTS & UNIQUE INDEXES (RACE CONDITION DEFENSE)
 -- ==============================================================================
+CREATE UNIQUE INDEX IF NOT EXISTS idx_players_lower_gamertag ON public.players(lower(gamer_tag));
+CREATE UNIQUE INDEX IF NOT EXISTS idx_registrations_player_game_active ON public.registrations(lower(gamer_tag), lower(game_id)) WHERE status != 'REJECTED';
 CREATE INDEX IF NOT EXISTS idx_events_game_id ON public.events(game_id);
 CREATE INDEX IF NOT EXISTS idx_events_status ON public.events(event_status);
-CREATE INDEX IF NOT EXISTS idx_players_gamertag ON public.players(gamer_tag);
-CREATE INDEX IF NOT EXISTS idx_players_game ON public.players(game);
 CREATE INDEX IF NOT EXISTS idx_leaderboard_game ON public.leaderboard(game);
 CREATE INDEX IF NOT EXISTS idx_leaderboard_points ON public.leaderboard(points DESC);
 CREATE INDEX IF NOT EXISTS idx_registrations_event_id ON public.registrations(event_id);
@@ -201,9 +202,9 @@ CREATE INDEX IF NOT EXISTS idx_match_results_event_id ON public.match_results(ev
 CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON public.sessions(expires_at);
 
 -- ==============================================================================
--- ROW LEVEL SECURITY (RLS) POLICIES
+-- HARDENED ROW LEVEL SECURITY (RLS) POLICIES
 -- ==============================================================================
--- Enable RLS on all tables
+-- Enable RLS on ALL tables
 ALTER TABLE public.admins ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.games ENABLE ROW LEVEL SECURITY;
@@ -217,100 +218,113 @@ ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.payouts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.system_settings ENABLE ROW LEVEL SECURITY;
 
--- 1. Public Read Policies for all tournament spectator tables
+-- Clean existing overly-permissive policies
 DO $$
 BEGIN
+    -- Drop all legacy insecure public policies
     DROP POLICY IF EXISTS "Public Read Games" ON public.games;
-    CREATE POLICY "Public Read Games" ON public.games FOR SELECT USING (true);
-
     DROP POLICY IF EXISTS "Public Read Events" ON public.events;
-    CREATE POLICY "Public Read Events" ON public.events FOR SELECT USING (true);
-
     DROP POLICY IF EXISTS "Public Read Players" ON public.players;
-    CREATE POLICY "Public Read Players" ON public.players FOR SELECT USING (true);
-
     DROP POLICY IF EXISTS "Public Read Leaderboard" ON public.leaderboard;
-    CREATE POLICY "Public Read Leaderboard" ON public.leaderboard FOR SELECT USING (true);
-
     DROP POLICY IF EXISTS "Public Read Registrations" ON public.registrations;
-    CREATE POLICY "Public Read Registrations" ON public.registrations FOR SELECT USING (true);
-
     DROP POLICY IF EXISTS "Public Read Match Results" ON public.match_results;
-    CREATE POLICY "Public Read Match Results" ON public.match_results FOR SELECT USING (true);
-
     DROP POLICY IF EXISTS "Public Read Draws" ON public.draws;
-    CREATE POLICY "Public Read Draws" ON public.draws FOR SELECT USING (true);
-
     DROP POLICY IF EXISTS "Public Read Audit Logs" ON public.audit_logs;
-    CREATE POLICY "Public Read Audit Logs" ON public.audit_logs FOR SELECT USING (true);
-
     DROP POLICY IF EXISTS "Public Read Payouts" ON public.payouts;
-    CREATE POLICY "Public Read Payouts" ON public.payouts FOR SELECT USING (true);
-
     DROP POLICY IF EXISTS "Public Read System Settings" ON public.system_settings;
-    CREATE POLICY "Public Read System Settings" ON public.system_settings FOR SELECT USING (true);
-
-    -- 2. Allow Public Insert for Tournament Registrations & Players
     DROP POLICY IF EXISTS "Public Insert Registrations" ON public.registrations;
-    CREATE POLICY "Public Insert Registrations" ON public.registrations FOR INSERT WITH CHECK (true);
-
     DROP POLICY IF EXISTS "Public Insert Players" ON public.players;
-    CREATE POLICY "Public Insert Players" ON public.players FOR INSERT WITH CHECK (true);
 
-    -- 3. Service Role & Full Access for backend driver
+    -- Drop legacy wildcard service role policies
     DROP POLICY IF EXISTS "Service Role Full Access Games" ON public.games;
-    CREATE POLICY "Service Role Full Access Games" ON public.games FOR ALL USING (true) WITH CHECK (true);
-
     DROP POLICY IF EXISTS "Service Role Full Access Events" ON public.events;
-    CREATE POLICY "Service Role Full Access Events" ON public.events FOR ALL USING (true) WITH CHECK (true);
-
     DROP POLICY IF EXISTS "Service Role Full Access Players" ON public.players;
-    CREATE POLICY "Service Role Full Access Players" ON public.players FOR ALL USING (true) WITH CHECK (true);
-
     DROP POLICY IF EXISTS "Service Role Full Access Leaderboard" ON public.leaderboard;
-    CREATE POLICY "Service Role Full Access Leaderboard" ON public.leaderboard FOR ALL USING (true) WITH CHECK (true);
-
     DROP POLICY IF EXISTS "Service Role Full Access Registrations" ON public.registrations;
-    CREATE POLICY "Service Role Full Access Registrations" ON public.registrations FOR ALL USING (true) WITH CHECK (true);
-
     DROP POLICY IF EXISTS "Service Role Full Access Match Results" ON public.match_results;
-    CREATE POLICY "Service Role Full Access Match Results" ON public.match_results FOR ALL USING (true) WITH CHECK (true);
-
     DROP POLICY IF EXISTS "Service Role Full Access Draws" ON public.draws;
-    CREATE POLICY "Service Role Full Access Draws" ON public.draws FOR ALL USING (true) WITH CHECK (true);
-
     DROP POLICY IF EXISTS "Service Role Full Access Audit Logs" ON public.audit_logs;
-    CREATE POLICY "Service Role Full Access Audit Logs" ON public.audit_logs FOR ALL USING (true) WITH CHECK (true);
-
     DROP POLICY IF EXISTS "Service Role Full Access Payouts" ON public.payouts;
-    CREATE POLICY "Service Role Full Access Payouts" ON public.payouts FOR ALL USING (true) WITH CHECK (true);
-
     DROP POLICY IF EXISTS "Service Role Full Access Admins" ON public.admins;
-    CREATE POLICY "Service Role Full Access Admins" ON public.admins FOR ALL USING (true) WITH CHECK (true);
-
     DROP POLICY IF EXISTS "Service Role Full Access Sessions" ON public.sessions;
-    CREATE POLICY "Service Role Full Access Sessions" ON public.sessions FOR ALL USING (true) WITH CHECK (true);
-
     DROP POLICY IF EXISTS "Service Role Full Access System Settings" ON public.system_settings;
-    CREATE POLICY "Service Role Full Access System Settings" ON public.system_settings FOR ALL USING (true) WITH CHECK (true);
 END $$;
 
+-- ─── 1. PUBLIC SPECTATOR ACCESS (SELECT ONLY FOR NON-SENSITIVE DATA) ──────────
+-- Public may ONLY inspect the games list, active events, and public leaderboard
+CREATE POLICY "Public Read Games" ON public.games
+    FOR SELECT TO anon, authenticated
+    USING (true);
+
+CREATE POLICY "Public Read Events" ON public.events
+    FOR SELECT TO anon, authenticated
+    USING (true);
+
+CREATE POLICY "Public Read Leaderboard" ON public.leaderboard
+    FOR SELECT TO anon, authenticated
+    USING (true);
+
+-- ─── 2. RESTRICT SENSITIVE TABLES TO SERVICE ROLE ONLY ───────────────────────
+-- Sensitive tables (admins, sessions, players, registrations, audit_logs, payouts,
+-- match_results, draws, system_settings) CANNOT be queried by anon/browser directly.
+-- The Express API service role is granted full access.
+
+CREATE POLICY "Service Role Only Admins" ON public.admins
+    FOR ALL TO service_role
+    USING (true) WITH CHECK (true);
+
+CREATE POLICY "Service Role Only Sessions" ON public.sessions
+    FOR ALL TO service_role
+    USING (true) WITH CHECK (true);
+
+CREATE POLICY "Service Role Only Players" ON public.players
+    FOR ALL TO service_role
+    USING (true) WITH CHECK (true);
+
+CREATE POLICY "Service Role Only Registrations" ON public.registrations
+    FOR ALL TO service_role
+    USING (true) WITH CHECK (true);
+
+CREATE POLICY "Service Role Only Match Results" ON public.match_results
+    FOR ALL TO service_role
+    USING (true) WITH CHECK (true);
+
+CREATE POLICY "Service Role Only Draws" ON public.draws
+    FOR ALL TO service_role
+    USING (true) WITH CHECK (true);
+
+CREATE POLICY "Service Role Only Audit Logs" ON public.audit_logs
+    FOR ALL TO service_role
+    USING (true) WITH CHECK (true);
+
+CREATE POLICY "Service Role Only Payouts" ON public.payouts
+    FOR ALL TO service_role
+    USING (true) WITH CHECK (true);
+
+CREATE POLICY "Service Role Only System Settings" ON public.system_settings
+    FOR ALL TO service_role
+    USING (true) WITH CHECK (true);
+
+CREATE POLICY "Service Role Full Games" ON public.games
+    FOR ALL TO service_role
+    USING (true) WITH CHECK (true);
+
+CREATE POLICY "Service Role Full Events" ON public.events
+    FOR ALL TO service_role
+    USING (true) WITH CHECK (true);
+
+CREATE POLICY "Service Role Full Leaderboard" ON public.leaderboard
+    FOR ALL TO service_role
+    USING (true) WITH CHECK (true);
+
 -- ==============================================================================
--- REALTIME REPLICATION SETUP
+-- REALTIME REPLICATION (PUBLIC CHANNELS ONLY)
 -- ==============================================================================
--- Add tables to the supabase_realtime publication for instant live frontend syncing
 DO $$
 BEGIN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.events;
-    ALTER PUBLICATION supabase_realtime ADD TABLE public.players;
-    ALTER PUBLICATION supabase_realtime ADD TABLE public.leaderboard;
-    ALTER PUBLICATION supabase_realtime ADD TABLE public.registrations;
-    ALTER PUBLICATION supabase_realtime ADD TABLE public.match_results;
-    ALTER PUBLICATION supabase_realtime ADD TABLE public.draws;
-    ALTER PUBLICATION supabase_realtime ADD TABLE public.audit_logs;
     ALTER PUBLICATION supabase_realtime ADD TABLE public.games;
-    ALTER PUBLICATION supabase_realtime ADD TABLE public.payouts;
-    ALTER PUBLICATION supabase_realtime ADD TABLE public.system_settings;
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.leaderboard;
 EXCEPTION
     WHEN duplicate_object THEN NULL;
     WHEN others THEN NULL;
@@ -319,19 +333,6 @@ END $$;
 -- ==============================================================================
 -- INITIAL SEED DATA
 -- ==============================================================================
-
--- 1. Admin Seed (Disabled / Commented out - no hardcoded credentials)
--- INSERT INTO public.admins (id, username, display_name, password_hash, role)
--- VALUES (
---     'adm-root',
---     'admin',
---     'BlackHawk High Command',
---     '$2b$10$...',
---     'ADMIN'
--- )
--- ON CONFLICT (username) DO NOTHING;
-
--- 2. Official Games Seed
 INSERT INTO public.games (id, name, description, logo, banner, category, default_prize_pool, format, active)
 VALUES 
 ('freefire', 'FREE FIRE', 'Free Fire high-octane survival clash, squad gauntlet & 1v1 challenge.', '/assets/badge_freefire.png', '/assets/official_game_freefire.png', 'SURVIVAL SHOOTER', 700, 'SQUAD & 1v1', true),
@@ -341,5 +342,3 @@ VALUES
 ('chess', 'CHESS', 'Rapid and blitz tactical mastery across 64 squares.', '/assets/badge_bgmi.png', '/assets/official_game_bgmi.png', 'STRATEGY', 200, 'SOLO', true),
 ('scribble', 'SCRIBBLE', 'Lightning speed sketch & guess community showdown.', '/assets/badge_minecraft.png', '/assets/official_game_minecraft.png', 'PARTY & CASUAL', 150, 'SOLO', true)
 ON CONFLICT (id) DO NOTHING;
-
-

@@ -449,18 +449,13 @@ export const RegistrationSection: React.FC<RegistrationProps> = ({
         }
       }
 
-      // Submit directly to REAL database API endpoint & fallback handlers
-      let result: any = null;
-      try {
-        result = await adminApi.submitRegistration({
-          fullName,
-          gamerTag,
-          discordUsername,
-          games: entries
-        });
-      } catch (e: any) {
-        console.warn('API error during registration, checking tournament store fallback...', e);
-      }
+      // Submit directly to REAL database API endpoint
+      const result = await adminApi.submitRegistration({
+        fullName,
+        gamerTag,
+        discordUsername,
+        games: entries
+      });
 
       // Sync to tournament store so UI state updates immediately
       try {

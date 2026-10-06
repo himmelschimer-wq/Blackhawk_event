@@ -1,4 +1,5 @@
 import { db } from './db.js';
+import crypto from 'crypto';
 
 const FIREBASE_BASE_URL = (
   process.env.VITE_FIREBASE_DATABASE_URL ||
@@ -86,7 +87,7 @@ export async function syncAllTablesToFirebase(): Promise<{ success: boolean; cou
         const rows = db.prepare(`SELECT * FROM ${col}`).all() as any[];
         const map: Record<string, any> = {};
         for (const r of rows) {
-          const id = r.id || r.playerId || `item-${Math.random()}`;
+          const id = r.id || r.playerId || `item-${crypto.randomUUID()}`;
           map[id] = cleanForFirebase(r);
         }
         fullTree[col] = map;

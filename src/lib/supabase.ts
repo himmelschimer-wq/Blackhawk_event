@@ -1,14 +1,8 @@
 import { createClient, type SupabaseClient, type RealtimeChannel } from '@supabase/supabase-js';
 
-export const SUPABASE_URL = (
-  import.meta.env.VITE_SUPABASE_URL ||
-  'https://inwyqpxnnirfaqltzorz.supabase.co'
-).trim();
+export const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL || '').trim();
 
-export const SUPABASE_ANON_KEY = (
-  import.meta.env.VITE_SUPABASE_ANON_KEY ||
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlud3lxcHhubmlyZmFxbHR6b3J6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA4NzQxOTYsImV4cCI6MjEwNjQ1MDE5Nn0.Ls1fM8YlTsCJFL83vp790pw9_T7rZ686uJEs7ljxnj8'
-).trim();
+export const SUPABASE_ANON_KEY = (import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim();
 
 export const isSupabaseConfigured = Boolean(
   SUPABASE_URL && 
@@ -16,22 +10,25 @@ export const isSupabaseConfigured = Boolean(
   !SUPABASE_URL.includes('xyzcompany')
 );
 
-// Initialize Supabase Client
-export const supabase: SupabaseClient = createClient(
-  SUPABASE_URL,
-  SUPABASE_ANON_KEY,
-  {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-    },
-    realtime: {
-      params: {
-        eventsPerSecond: 10
+// Initialize Supabase Client (safe fallback if not configured in client environment)
+export const supabase: SupabaseClient = isSupabaseConfigured
+  ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
+      realtime: {
+        params: {
+          eventsPerSecond: 10
+        }
       }
-    }
-  }
-);
+    })
+  : createClient('https://unconfigured.supabase.co', 'unconfigured-placeholder-key', {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      }
+    });
 
 export type SupabaseConnectionState = 'connecting' | 'connected' | 'disconnected' | 'permission-denied' | 'error' | 'not-configured';
 

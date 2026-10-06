@@ -1,20 +1,16 @@
+import './env.js';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 
-const SUPABASE_URL = (
-  process.env.SUPABASE_URL ||
-  process.env.VITE_SUPABASE_URL ||
-  'https://inwyqpxnnirfaqltzorz.supabase.co'
-).trim().replace(/\/$/, '');
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-const SUPABASE_KEY = (
-  process.env.SUPABASE_SERVICE_ROLE_KEY ||
-  process.env.SUPABASE_ANON_KEY ||
-  process.env.VITE_SUPABASE_ANON_KEY ||
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlud3lxcHhubmlyZmFxbHR6b3J6Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MDg3NDE5NiwiZXhwIjoyMTA2NDUwMTk2fQ.hWk0VauGFv4PIYiAl5RewYIl4iNaOKj70vYurX8Q9CY'
-).trim();
+if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+  throw new Error("Missing required Supabase server configuration");
+}
 
-// Local in-memory fallback cache when Supabase credentials are pending
+// Local in-memory fallback cache when running isolated tests
 const localFallbackMemory: Record<string, Record<string, any>> = {
   admins: {},
   sessions: {},
@@ -31,11 +27,15 @@ const localFallbackMemory: Record<string, Record<string, any>> = {
 };
 
 let supabaseInstance: SupabaseClient | null = null;
-export const isSupabaseConfigured = Boolean(SUPABASE_URL && SUPABASE_KEY);
+export const isSupabaseConfigured = Boolean(
+  SUPABASE_URL &&
+  SUPABASE_SERVICE_ROLE_KEY &&
+  !SUPABASE_URL.includes('test-placeholder')
+);
 
 if (isSupabaseConfigured) {
   try {
-    supabaseInstance = createClient(SUPABASE_URL, SUPABASE_KEY, {
+    supabaseInstance = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
       auth: {
         persistSession: false,
         autoRefreshToken: false,
@@ -45,8 +45,6 @@ if (isSupabaseConfigured) {
   } catch (err: any) {
     console.warn('[Supabase DB] Failed to create Supabase client:', err?.message);
   }
-} else {
-  console.log('[Supabase DB] Note: SUPABASE_URL / SUPABASE_KEY not yet configured in .env. Using in-memory fallback cache.');
 }
 
 export const supabase = supabaseInstance;
@@ -122,7 +120,6 @@ export const supabaseDb = {
 
   async get<T = any>(path: string): Promise<T | null> {
     const table = normalizeTable(path);
-    // If path is e.g. "blackhawk/events/ev-ff-1"
     const parts = path.replace(/^blackhawk\//, '').split('/');
     if (parts.length >= 2) {
       const targetTable = normalizeTable(parts[0]);
@@ -133,7 +130,7 @@ export const supabaseDb = {
           const { data, error } = await supabaseInstance
             .from(targetTable)
             .select('*')
-            .eq('id', id)
+            .eq(targetTable === 'system_settings' ? 'key' : 'id', id)
             .maybeSingle();
 
           if (!error && data) return fromDbRow<T>(data);
@@ -147,7 +144,6 @@ export const supabaseDb = {
       return cached ? (fromDbRow<T>(cached) || null) : null;
     }
 
-    // Otherwise treat as list or single table
     return (await this.list<T>(table)) as unknown as T;
   },
 
@@ -266,6 +262,90 @@ export const supabaseDb = {
     return Object.values(cached).map(r => fromDbRow<T>(r));
   },
 
+  async findBy<T = any>(collection: string, column: string, value: any): Promise<T | null> {
+    const targetTable = normalizeTable(collection);
+    const snakeCol = column.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+
+    if (supabaseInstance) {
+      try {
+        const { data, error } = await supabaseInstance
+          .from(targetTable)
+          .select('*')
+          .eq(snakeCol, value)
+          .maybeSingle();
+
+        if (!error && data) return fromDbRow<T>(data);
+      } catch {}
+    }
+
+    const cached = localFallbackMemory[targetTable] || {};
+    const item = Object.values(cached).find((row: any) => row[column] === value || row[snakeCol] === value);
+    return item ? fromDbRow<T>(item) : null;
+  },
+
+  async listWithFilter<T = any>(
+    collection: string,
+    options: {
+      select?: string;
+      where?: Record<string, any>;
+      limit?: number;
+      offset?: number;
+      orderBy?: string;
+      ascending?: boolean;
+    } = {}
+  ): Promise<T[]> {
+    const targetTable = normalizeTable(collection);
+
+    if (supabaseInstance) {
+      try {
+        let query = supabaseInstance
+          .from(targetTable)
+          .select(options.select || '*');
+
+        if (options.where) {
+          for (const [col, val] of Object.entries(options.where)) {
+            if (val !== undefined && val !== null) {
+              const snake = col.replace(/[A-Z]/g, l => `_${l.toLowerCase()}`);
+              query = query.eq(snake, val);
+            }
+          }
+        }
+
+        if (options.orderBy) {
+          const snakeOrder = options.orderBy.replace(/[A-Z]/g, l => `_${l.toLowerCase()}`);
+          query = query.order(snakeOrder, { ascending: options.ascending ?? true });
+        }
+
+        if (options.limit) {
+          query = query.limit(options.limit);
+        }
+
+        if (options.offset) {
+          query = query.range(options.offset, (options.offset + (options.limit || 50)) - 1);
+        }
+
+        const { data, error } = await query;
+        if (!error && Array.isArray(data)) {
+          return data.map(r => fromDbRow<T>(r));
+        }
+      } catch {}
+    }
+
+    let items = Object.values(localFallbackMemory[targetTable] || {}).map(r => fromDbRow<T>(r));
+    if (options.where) {
+      items = items.filter(item => {
+        for (const [k, v] of Object.entries(options.where!)) {
+          if ((item as any)[k] !== v) return false;
+        }
+        return true;
+      });
+    }
+    if (options.limit) {
+      items = items.slice(options.offset || 0, (options.offset || 0) + options.limit);
+    }
+    return items;
+  },
+
   async findOne<T = any>(collection: string, predicate: (item: T) => boolean): Promise<T | null> {
     const all = await this.list<T>(collection);
     return all.find(predicate) || null;
@@ -289,7 +369,7 @@ export async function initSupabaseDatabase() {
     if (admins.length === 0 && process.env.ADMIN_USERNAME && process.env.ADMIN_PASSWORD) {
       const adminUser = process.env.ADMIN_USERNAME.trim();
       const adminPass = process.env.ADMIN_PASSWORD.trim();
-      const salt = bcrypt.genSaltSync(10);
+      const salt = bcrypt.genSaltSync(12);
       const hash = bcrypt.hashSync(adminPass, salt);
       const adminId = 'adm-' + Date.now();
 
@@ -385,115 +465,69 @@ export async function initSupabaseDatabase() {
       for (const g of defaultGames) {
         await supabaseDb.set(`blackhawk/games/${g.id}`, g);
       }
-      console.log('[Supabase DB] Seeded 6 official games into Supabase.');
+      console.log(`[Supabase DB] Seeded ${defaultGames.length} default esports games.`);
     }
 
-    // 3. Clean up and deduplicate any existing duplicate player and leaderboard rows
-    await deduplicateDatabaseRecords();
+    // 3. Seed Default Events
+    const events = await supabaseDb.list('events');
+    if (events.length === 0) {
+      const defaultEvents = [
+        {
+          id: 'ev-ff-1',
+          gameId: 'freefire',
+          gameName: 'FREE FIRE',
+          title: 'Free Fire Weekend Clash',
+          description: 'Squad battle royale tournament with intense 1v1 King of the Hill finale.',
+          date: 'Saturday, 8:00 PM IST',
+          time: '20:00',
+          format: 'Squad & 1v1 Challenge',
+          prizePool: 700,
+          maxParticipants: 48,
+          registrationStatus: 'OPEN',
+          eventStatus: 'REGISTRATION OPEN',
+          rules: 'Free Fire official competitive esports rules apply.',
+          generalRules: 'Fair play enforced. Emulators strictly disallowed without admin approval.',
+          banner: '/assets/official_game_freefire.png',
+          prizeRules: {
+            firstPlace: 400,
+            secondPlace: 200,
+            mvpBonus: 100,
+            challenge1v1Bonus: 150,
+            participationDraw: 50
+          },
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        },
+        {
+          id: 'ev-bgmi-1',
+          gameId: 'bgmi',
+          gameName: 'BGMI',
+          title: 'BGMI Erangel Domination Cup',
+          description: 'Competitive squads clash on Erangel for the championship crown.',
+          date: 'Sunday, 7:00 PM IST',
+          time: '19:00',
+          format: 'Squad',
+          prizePool: 350,
+          maxParticipants: 64,
+          registrationStatus: 'OPEN',
+          eventStatus: 'REGISTRATION OPEN',
+          rules: 'Standard BGMI esports point table and rotation format.',
+          banner: '/assets/official_game_bgmi.png',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        }
+      ];
 
-    // 4. Fully sync all registrations and players to players & leaderboard tables
-    await syncPlayersAndRegistrations();
-
-    console.log('[Supabase DB] Ready and operational.');
+      for (const ev of defaultEvents) {
+        await supabaseDb.set(`blackhawk/events/${ev.id}`, ev);
+      }
+      console.log(`[Supabase DB] Seeded ${defaultEvents.length} default tournament events.`);
+    }
   } catch (err: any) {
-    console.error('[Supabase DB] Initialization error:', err?.message);
+    console.warn('[Supabase DB] Error in initSupabaseDatabase():', err?.message);
   }
 }
 
-/**
- * Automatically clean up and consolidate duplicate player & leaderboard rows
- */
-export async function deduplicateDatabaseRecords() {
-  try {
-    // 1. Deduplicate Players
-    const players = await supabaseDb.list<any>('players');
-    const playerGroups = new Map<string, any[]>();
-    for (const p of players) {
-      const tag = (p.gamerTag || p.gamer_tag || '').trim().toLowerCase();
-      if (!tag) continue;
-      if (!playerGroups.has(tag)) playerGroups.set(tag, []);
-      playerGroups.get(tag)!.push(p);
-    }
-
-    for (const [tag, group] of playerGroups.entries()) {
-      if (group.length > 1) {
-        group.sort((a, b) => {
-          const aCreated = new Date(a.createdAt || a.created_at || 0).getTime();
-          const bCreated = new Date(b.createdAt || b.created_at || 0).getTime();
-          return aCreated - bCreated;
-        });
-        const primary = group[0];
-        const duplicates = group.slice(1);
-
-        for (const dup of duplicates) {
-          const dupId = dup.id;
-          if (!dupId || dupId === primary.id) continue;
-          
-          if (supabaseInstance) {
-            try {
-              await supabaseInstance.from('registrations').update({ player_id: primary.id }).eq('player_id', dupId);
-              await supabaseInstance.from('match_results').update({ player_id: primary.id }).eq('player_id', dupId);
-              await supabaseInstance.from('players').delete().eq('id', dupId);
-            } catch {}
-          }
-          if (localFallbackMemory.players && localFallbackMemory.players[dupId]) {
-            delete localFallbackMemory.players[dupId];
-          }
-        }
-        console.log(`[Supabase DB] Deduplicated ${duplicates.length} duplicate player record(s) for gamer tag "${tag}".`);
-      }
-    }
-
-    // 2. Deduplicate Leaderboard
-    const lbEntries = await supabaseDb.list<any>('leaderboard');
-    const lbGroups = new Map<string, any[]>();
-    for (const lb of lbEntries) {
-      const tag = (lb.gamerTag || lb.gamer_tag || '').trim().toLowerCase();
-      if (!tag) continue;
-      if (!lbGroups.has(tag)) lbGroups.set(tag, []);
-      lbGroups.get(tag)!.push(lb);
-    }
-
-    for (const [tag, group] of lbGroups.entries()) {
-      if (group.length > 1) {
-        group.sort((a, b) => (Number(b.points) || 0) - (Number(a.points) || 0));
-        const primary = group[0];
-        const maxPoints = group.reduce((max, e) => Math.max(max, Number(e.points) || 0), 0);
-        const maxWins = group.reduce((max, e) => Math.max(max, Number(e.wins) || 0), 0);
-        const maxMatches = group.reduce((max, e) => Math.max(max, Number(e.matches) || 0), 0);
-        const maxScore = group.reduce((max, e) => Math.max(max, Number(e.score) || 0), 0);
-
-        primary.points = maxPoints;
-        primary.wins = maxWins;
-        primary.matches = maxMatches;
-        primary.score = maxScore;
-
-        const duplicates = group.slice(1);
-        for (const dup of duplicates) {
-          const dupId = dup.id;
-          if (dupId && dupId !== primary.id) {
-            if (supabaseInstance) {
-              try {
-                await supabaseInstance.from('leaderboard').delete().eq('id', dupId);
-              } catch {}
-            }
-            if (localFallbackMemory.leaderboard && localFallbackMemory.leaderboard[dupId]) {
-              delete localFallbackMemory.leaderboard[dupId];
-            }
-          }
-        }
-        await supabaseDb.set(`blackhawk/leaderboard/${primary.id}`, primary);
-        console.log(`[Supabase DB] Deduplicated ${duplicates.length} duplicate leaderboard record(s) for gamer tag "${tag}".`);
-      }
-    }
-  } catch (err: any) {
-    console.warn('[Supabase DB] Deduplication check completed with notice:', err?.message);
-  }
-}
-
-/**
- * Helper to extract Discord User ID (snowflake)
- */
 function extractDiscordUserId(details?: any, discordUsername?: string): string | null {
   if (details && typeof details === 'object') {
     for (const key of Object.keys(details)) {
@@ -513,26 +547,11 @@ function extractDiscordUserId(details?: any, discordUsername?: string): string |
   return null;
 }
 
-/**
- * Helper to generate Discord Avatar URL supporting Discord User IDs
- */
 async function getDiscordAvatarUrl(discordUsername?: string, gamerTag?: string, userId?: string | null): Promise<string> {
   const cleanId = (userId || '').trim();
   const clean = (discordUsername || gamerTag || 'Player').trim().replace(/^@/, '');
 
   if (/^\d{16,21}$/.test(cleanId)) {
-    try {
-      const res = await fetch(`https://japi.rest/discord/v1/user/${cleanId}`, {
-        signal: AbortSignal.timeout(3500)
-      });
-      if (res.ok) {
-        const json = (await res.json()) as any;
-        const data = json?.data;
-        if (data?.avatarURL) return data.avatarURL;
-        if (data?.defaultAvatarURL) return data.defaultAvatarURL;
-      }
-    } catch {}
-
     try {
       const idx = Number((BigInt(cleanId) >> 22n) % 6n);
       return `https://cdn.discordapp.com/embed/avatars/${idx}.png`;
@@ -552,38 +571,12 @@ export async function syncPlayersAndRegistrations() {
   try {
     console.log('[Supabase DB] Synchronizing registrations, players, and leaderboard tables...');
 
-    // 1. Fetch current tables
-    const [rawPlayers, rawRegs, rawLb] = await Promise.all([
-      supabaseDb.list<any>('players'),
-      supabaseDb.list<any>('registrations'),
-      supabaseDb.list<any>('leaderboard')
-    ]);
-
-    // 2. Clean up any dummy test data
-    for (const r of rawRegs) {
-      if ((r.gamerTag || r.gamer_tag || '').toUpperCase().includes('DEDUP_CHAMP')) {
-        await supabaseDb.delete(`blackhawk/registrations/${r.id}`);
-      }
-    }
-    for (const p of rawPlayers) {
-      if ((p.gamerTag || p.gamer_tag || '').toUpperCase().includes('DEDUP_CHAMP')) {
-        await supabaseDb.delete(`blackhawk/players/${p.id}`);
-      }
-    }
-    for (const l of rawLb) {
-      if ((l.gamerTag || l.gamer_tag || '').toUpperCase().includes('DEDUP_CHAMP')) {
-        await supabaseDb.delete(`blackhawk/leaderboard/${l.id}`);
-      }
-    }
-
-    // 3. Re-read active records
     const [players, registrations, leaderboard] = await Promise.all([
       supabaseDb.list<any>('players'),
       supabaseDb.list<any>('registrations'),
       supabaseDb.list<any>('leaderboard')
     ]);
 
-    // 4. Map existing players by normalized gamer tag
     const playerMap = new Map<string, any>();
     for (const p of players) {
       const tag = (p.gamerTag || p.gamer_tag || '').trim().toLowerCase();
@@ -592,7 +585,6 @@ export async function syncPlayersAndRegistrations() {
       }
     }
 
-    // 5. Sync Registrations -> Players & Deduplicate strictly per (player + game)
     const regGroups = new Map<string, any[]>();
     for (const reg of registrations) {
       const trimmedTag = (reg.gamerTag || reg.gamer_tag || '').trim();
@@ -604,8 +596,7 @@ export async function syncPlayersAndRegistrations() {
       regGroups.get(key)!.push(reg);
     }
 
-    for (const [key, group] of regGroups.entries()) {
-      // Sort: prefer row with eventId, then most complete details, then newest
+    for (const [, group] of regGroups.entries()) {
       group.sort((a, b) => {
         const aHasEvent = Boolean((a.eventId || a.event_id) && (a.eventId || a.event_id) !== 'null');
         const bHasEvent = Boolean((b.eventId || b.event_id) && (b.eventId || b.event_id) !== 'null');
@@ -622,12 +613,10 @@ export async function syncPlayersAndRegistrations() {
       const primary = group[0];
       const duplicates = group.slice(1);
 
-      // Clean up any duplicates
       for (const dup of duplicates) {
         await supabaseDb.delete(`blackhawk/registrations/${dup.id}`);
       }
 
-      // Ensure primary player exists and is linked
       const trimmedTag = (primary.gamerTag || primary.gamer_tag || '').trim();
       const trimmedName = (primary.playerName || primary.player_name || trimmedTag).trim();
       const trimmedDiscord = (primary.discordUsername || primary.discord_username || 'N/A').trim();
@@ -640,7 +629,7 @@ export async function syncPlayersAndRegistrations() {
       if (!player) {
         const newPlayerId = (primary.playerId || primary.player_id) && String(primary.playerId || primary.player_id).startsWith('ply-')
           ? String(primary.playerId || primary.player_id)
-          : `ply-${Date.now().toString(36)}${Math.random().toString(36).substring(2, 5)}`;
+          : `ply-${crypto.randomUUID()}`;
 
         player = {
           id: newPlayerId,
@@ -660,20 +649,15 @@ export async function syncPlayersAndRegistrations() {
         playerMap.set(normTag, player);
       }
 
-      // Link primary registration
       if ((primary.playerId || primary.player_id) !== player.id) {
         await supabaseDb.update(`blackhawk/registrations/${primary.id}`, {
           playerId: player.id,
           playerName: trimmedName,
-          gamerTag: trimmedTag,
-          discordUsername: trimmedDiscord,
-          email: trimmedEmail,
-          phone: trimmedPhone
+          gamerTag: trimmedTag
         });
       }
     }
 
-    // 6. Sync Players -> Leaderboard
     const latestPlayers = await supabaseDb.list<any>('players');
     const lbMap = new Map<string, any>();
     for (const l of leaderboard) {
@@ -681,7 +665,6 @@ export async function syncPlayersAndRegistrations() {
       if (tag) lbMap.set(tag, l);
     }
 
-    // Map gamer tags to Discord User IDs from registrations
     const regDiscordIdMap = new Map<string, string>();
     for (const r of registrations) {
       const tag = (r.gamerTag || r.gamer_tag || '').trim().toLowerCase();
@@ -740,4 +723,3 @@ export async function syncPlayersAndRegistrations() {
     return { success: false, error: err?.message };
   }
 }
-
