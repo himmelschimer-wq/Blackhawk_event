@@ -265,15 +265,29 @@ export const PlayerProfileModal: React.FC<PlayerProfileModalProps> = ({ player, 
   const bannerImage = player.banner || player.avatar || avatarUrl;
 
   // Total points and calculable point components
-  const totalPoints = Number(player.totalPoints || player.points || 0);
+  const totalPoints = Number(player.totalPoints ?? player.points ?? 0);
   const wins = Number(player.wins || 0);
   const matches = Number(player.matches || 0);
   const kills = Number(player.score || 0);
 
-  const placementPoints = player.placementPoints !== undefined ? Number(player.placementPoints) : (wins * 10);
-  const killPoints = player.killPoints !== undefined ? Number(player.killPoints) : kills;
-  const participationPoints = player.participationPoints !== undefined ? Number(player.participationPoints) : Math.max(0, matches > wins ? (matches - wins) : 0);
-  const challengeBonus = player.challengeBonus !== undefined ? Number(player.challengeBonus) : Math.max(0, totalPoints - placementPoints - killPoints - participationPoints);
+  // Derive calculable breakdown accurately so card values sum to totalPoints
+  const killPoints = Math.min(totalPoints, Math.max(0, player.killPoints !== undefined ? Number(player.killPoints) : kills));
+  const remainingAfterKills = Math.max(0, totalPoints - killPoints);
+
+  const rawPartPoints = player.participationPoints !== undefined 
+    ? Number(player.participationPoints) 
+    : Math.max(0, matches > wins ? (matches - wins) : 0);
+  const participationPoints = Math.min(remainingAfterKills, Math.max(0, rawPartPoints));
+  const remainingAfterPart = Math.max(0, remainingAfterKills - participationPoints);
+
+  // Placement points: capped by remaining points, aligned with tournament placement finishes
+  const rawPlacementPoints = player.placementPoints !== undefined 
+    ? Number(player.placementPoints) 
+    : (wins > 0 ? Math.min(remainingAfterPart, wins * 10) : remainingAfterPart);
+  const placementPoints = Math.min(remainingAfterPart, Math.max(0, rawPlacementPoints));
+
+  // Any remaining points belong to challenges / bonus points
+  const challengeBonus = Math.max(0, remainingAfterPart - placementPoints);
 
   const handleCopy = (text: string, fieldName: string) => {
     sfx.playClick();

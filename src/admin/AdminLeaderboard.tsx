@@ -17,6 +17,10 @@ interface LeaderboardEntry {
   points: number;
   status: string;
   rank?: number;
+  placementPoints?: number;
+  killPoints?: number;
+  participationPoints?: number;
+  challengeBonus?: number;
   updatedAt: string;
 }
 
@@ -405,9 +409,14 @@ export const AdminLeaderboard: React.FC = () => {
                               avatar: item.avatar,
                               rank: calculatedRank,
                               points: item.points,
+                              totalPoints: item.points,
                               wins: item.wins,
                               matches: item.matches,
                               score: item.score,
+                              placementPoints: item.placementPoints,
+                              killPoints: item.killPoints,
+                              participationPoints: item.participationPoints,
+                              challengeBonus: item.challengeBonus,
                               status: item.status,
                               updatedAt: item.updatedAt
                             });

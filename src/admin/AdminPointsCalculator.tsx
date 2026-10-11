@@ -41,7 +41,7 @@ const DEFAULT_PRESETS: Record<string, {
       1: 15, 2: 12, 3: 10, 4: 8, 5: 6, 6: 4, 7: 2, 8: 1, 9: 1, 10: 1, 11: 1, 12: 1
     },
     metrics: [
-      { id: 'placement', key: 'Placement Rank (#)', type: 'rank_table', multiplier: 1, defaultValue: 1, placeholder: 'e.g. 1' },
+      { id: 'placement', key: 'Placement Rank (#)', type: 'rank_table', multiplier: 1, defaultValue: 0, placeholder: 'e.g. 1' },
       { id: 'kills', key: 'Kills / Eliminations', type: 'multiplier', multiplier: 1, defaultValue: 0, placeholder: 'e.g. 8' },
       { id: 'damage', key: 'Damage Dealt', type: 'multiplier', multiplier: 0, defaultValue: 0, placeholder: 'e.g. 1540' }
     ]
@@ -52,7 +52,7 @@ const DEFAULT_PRESETS: Record<string, {
       1: 12, 2: 9, 3: 8, 4: 7, 5: 6, 6: 5, 7: 4, 8: 3, 9: 2, 10: 1
     },
     metrics: [
-      { id: 'placement', key: 'Placement Rank (#)', type: 'rank_table', multiplier: 1, defaultValue: 1, placeholder: 'e.g. 1' },
+      { id: 'placement', key: 'Placement Rank (#)', type: 'rank_table', multiplier: 1, defaultValue: 0, placeholder: 'e.g. 1' },
       { id: 'kills', key: 'Kills / Eliminations', type: 'multiplier', multiplier: 1, defaultValue: 0, placeholder: 'e.g. 6' },
       { id: 'headshots', key: 'Headshots', type: 'multiplier', multiplier: 1, defaultValue: 0, placeholder: 'e.g. 3' }
     ]
@@ -74,7 +74,7 @@ const DEFAULT_PRESETS: Record<string, {
       1: 10, 2: 6, 3: 4, 4: 2, 5: 1
     },
     metrics: [
-      { id: 'placement', key: 'Survival Rank (#)', type: 'rank_table', multiplier: 1, defaultValue: 1, placeholder: 'e.g. 1' },
+      { id: 'placement', key: 'Survival Rank (#)', type: 'rank_table', multiplier: 1, defaultValue: 0, placeholder: 'e.g. 1' },
       { id: 'beds_broken', key: 'Beds Destroyed', type: 'multiplier', multiplier: 5, defaultValue: 0, placeholder: 'e.g. 2' },
       { id: 'final_kills', key: 'Final Kills', type: 'multiplier', multiplier: 2, defaultValue: 0, placeholder: 'e.g. 4' },
       { id: 'kills', key: 'Normal Kills', type: 'multiplier', multiplier: 1, defaultValue: 0, placeholder: 'e.g. 7' }
@@ -146,7 +146,7 @@ export const AdminPointsCalculator: React.FC = () => {
       matchNumber: 1,
       matchLabel: 'Match 1',
       metricValues: {
-        placement: 1,
+        placement: 0,
         kills: 0,
         damage: 0
       }
@@ -311,8 +311,8 @@ export const AdminPointsCalculator: React.FC = () => {
         let points = 0;
 
         if (metric.type === 'rank_table') {
-          placement = Math.max(1, Math.round(rawValue));
-          points = customPlacementPoints[placement] ?? 0;
+          placement = Math.round(rawValue) > 0 ? Math.round(rawValue) : 0;
+          points = placement > 0 ? (customPlacementPoints[placement] ?? 0) : 0;
           breakdowns.push({
             key: metric.key,
             rawValue: placement,
@@ -453,7 +453,7 @@ export const AdminPointsCalculator: React.FC = () => {
         eventName: currentEvent?.title,
         points: seriesTotals.totalPoints,
         kills: seriesTotals.totalKills,
-        placement: matches[0]?.metricValues['placement'] || 1,
+        placement: Number(matches[0]?.metricValues['placement']) || 0,
         isWin: seriesTotals.totalWins > 0,
         breakdown: {
           seriesMatchesCount: matches.length,

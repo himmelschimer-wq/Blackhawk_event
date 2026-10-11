@@ -1219,10 +1219,15 @@ apiRouter.get('/leaderboard', async (req: Request, res: Response) => {
       const kills = Number(r.score) || 0;
 
       // Calculable points breakdown according to Blackhawk specifications
-      const placementPoints = Math.max(0, wins * 10);
-      const killPoints = kills;
-      const participationPoints = Math.max(0, matches > wins ? (matches - wins) : 0);
-      const challengeBonus = Math.max(0, totalPoints - placementPoints - killPoints - participationPoints);
+      const killPoints = Math.min(totalPoints, kills);
+      const remainingAfterKills = Math.max(0, totalPoints - killPoints);
+      const participationPoints = Math.min(remainingAfterKills, Math.max(0, matches > wins ? (matches - wins) : 0));
+      const remainingAfterPart = Math.max(0, remainingAfterKills - participationPoints);
+
+      // Placement points: capped by remaining tournament points (1st: 10, 2nd: 7, 3rd: 4, etc.)
+      const preferredPlacement = wins > 0 ? Math.min(remainingAfterPart, wins * 10) : remainingAfterPart;
+      const placementPoints = r.placementPoints !== undefined ? Math.min(remainingAfterPart, Number(r.placementPoints)) : preferredPlacement;
+      const challengeBonus = Math.max(0, remainingAfterPart - placementPoints);
 
       return {
         ...r,
@@ -1402,7 +1407,7 @@ apiRouter.post('/leaderboard/record-match', requireAdminAuth, async (req: Reques
     const cleanPlayerName = playerName || gamerTag;
     const matchPoints = Number(points) || 0;
     const matchKills = Number(kills) || 0;
-    const winIncrement = isWin || Number(placement) === 1 ? 1 : 0;
+    const winIncrement = isWin !== undefined ? (isWin ? 1 : 0) : (Number(placement) === 1 ? 1 : 0);
 
     // Search existing leaderboard entry by gamerTag, playerId, or playerName
     const allLeaderboard = await supabaseDb.list<any>('leaderboard');
