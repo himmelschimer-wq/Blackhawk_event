@@ -604,11 +604,35 @@ apiRouter.get('/events', async (req: Request, res: Response) => {
   try {
     const game = req.query.game as string | undefined;
     let events = await supabaseDb.list<any>('events');
+    const registrations = await supabaseDb.list<any>('registrations');
+
+    const regCounts: Record<string, number> = {};
+    for (const r of registrations) {
+      const evId = r.eventId || r.event_id;
+      if (evId) regCounts[evId] = (regCounts[evId] || 0) + 1;
+      const gId = r.gameId || r.game_id;
+      if (gId) regCounts[gId] = (regCounts[gId] || 0) + 1;
+    }
 
     if (game) {
       const gLower = game.toLowerCase();
       events = events.filter(e => (e.gameId && e.gameId.toLowerCase() === gLower) || (e.gameName && e.gameName.toLowerCase().includes(gLower)));
     }
+
+    events = events.map(e => {
+      const count = regCounts[e.id] ?? 0;
+      return {
+        ...e,
+        registration_status: e.registration_status || e.registrationStatus || 'OPEN',
+        registrationStatus: e.registration_status || e.registrationStatus || 'OPEN',
+        event_status: e.event_status || e.eventStatus || 'UPCOMING',
+        eventStatus: e.event_status || e.eventStatus || 'UPCOMING',
+        max_participants: e.max_participants ? Number(e.max_participants) : (e.maxParticipants ? Number(e.maxParticipants) : 48),
+        maxParticipants: e.max_participants ? Number(e.max_participants) : (e.maxParticipants ? Number(e.maxParticipants) : 48),
+        registeredCount: count,
+        registered_count: count,
+      };
+    });
 
     res.json(events);
   } catch (err: any) {
@@ -1548,6 +1572,34 @@ apiRouter.post('/registrations', async (req: Request, res: Response) => {
         error: `You've already registered for: ${duplicateGames.join(', ')}. Duplicate registrations are not allowed.`,
         duplicateGames
       });
+    }
+
+    // Guard: Verify event registration_status in database before inserting
+    for (const g of games) {
+      if (g.eventId) {
+        let ev = await supabaseDb.get<any>(`blackhawk/events/${g.eventId}`);
+        if (!ev && supabaseDb.client) {
+          try {
+            const { data } = await supabaseDb.client
+              .from('events')
+              .select('id, registration_status, event_status, max_participants')
+              .eq('id', g.eventId)
+              .maybeSingle();
+            if (data) ev = data;
+          } catch {}
+        }
+        if (ev) {
+          const regStatus = (ev.registration_status || ev.registrationStatus || '').toUpperCase();
+          const evStatus = (ev.event_status || ev.eventStatus || '').toUpperCase();
+          if (regStatus === 'CLOSED' || ['COMPLETED', 'CLOSED', 'CANCELLED'].includes(evStatus)) {
+            return res.status(403).json({
+              error: 'Registration for this tournament is currently closed.',
+              eventId: g.eventId,
+              status: 'CLOSED'
+            });
+          }
+        }
+      }
     }
 
     // 1. Find or create Player in database (Strictly deduplicated by gamer tag)

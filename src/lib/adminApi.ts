@@ -65,12 +65,15 @@ export function normalizeDbRow<T = any>(row: any): T {
   if (row.prize_pool !== undefined) normalized.prizePool = Number(row.prize_pool);
   if (row.prizePool !== undefined) normalized.prize_pool = Number(row.prizePool);
   if (row.max_participants !== undefined) normalized.maxParticipants = Number(row.max_participants);
+  if (row.maxParticipants !== undefined) normalized.max_participants = Number(row.maxParticipants);
   if (row.registration_status !== undefined) normalized.registrationStatus = row.registration_status;
   if (row.registrationStatus !== undefined) normalized.registration_status = row.registrationStatus;
   if (row.event_status !== undefined) normalized.eventStatus = row.event_status;
   if (row.eventStatus !== undefined) normalized.event_status = row.eventStatus;
   if (row.general_rules !== undefined) normalized.generalRules = row.general_rules;
   if (row.generalRules !== undefined) normalized.general_rules = row.generalRules;
+  if (row.registered_count !== undefined) normalized.registeredCount = Number(row.registered_count);
+  if (row.registeredCount !== undefined) normalized.registered_count = Number(row.registeredCount);
 
   // Leaderboard
   if (row.points !== undefined) normalized.points = Number(row.points) || 0;
@@ -958,6 +961,23 @@ export const adminApi = {
 
       if (isSupabaseConfigured) {
         try {
+          // Re-check event's registration_status in Supabase before insert
+          if (payload.eventId) {
+            const { data: eventRow } = await supabase
+              .from('events')
+              .select('id, registration_status, event_status, max_participants')
+              .eq('id', payload.eventId)
+              .maybeSingle();
+
+            if (eventRow) {
+              const regStatus = (eventRow.registration_status || '').toUpperCase();
+              const evStatus = (eventRow.event_status || '').toUpperCase();
+              if (regStatus === 'CLOSED' || ['COMPLETED', 'CLOSED', 'CANCELLED'].includes(evStatus)) {
+                throw new Error('Registration for this tournament is currently closed.');
+              }
+            }
+          }
+
           await supabase.from('registrations').upsert({
             id: gRegId,
             player_id: playerId,
@@ -974,8 +994,11 @@ export const adminApi = {
             status: 'REGISTERED',
             registered_at: registeredAt
           });
-        } catch (e) {
-          console.warn('Supabase reg insert fallback error:', e);
+        } catch (e: any) {
+          console.warn('Supabase reg insert error:', e);
+          if (e?.message?.includes('closed')) {
+            throw e;
+          }
         }
       }
 

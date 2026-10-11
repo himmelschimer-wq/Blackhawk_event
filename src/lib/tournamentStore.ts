@@ -46,11 +46,15 @@ export interface EventRecord {
   week: string;
   weekNumber: number;
   prizePool: number;
-  registrationStatus: 'OPEN' | 'CLOSED';
-  eventStatus: 'UPCOMING' | 'LIVE' | 'COMPLETED' | 'ARCHIVED';
+  registrationStatus: 'OPEN' | 'CLOSED' | string;
+  eventStatus: 'UPCOMING' | 'LIVE' | 'COMPLETED' | 'CLOSED' | 'CANCELLED' | 'ARCHIVED' | string;
   startDate: string;
   endDate: string;
   description: string;
+  maxParticipants?: number;
+  registration_status?: string;
+  event_status?: string;
+  max_participants?: number;
 }
 
 export interface MatchResultRecord {
@@ -584,6 +588,10 @@ class TournamentStore {
           prizePool: Number(e.prize_pool || 0),
           registrationStatus: e.registration_status || 'OPEN',
           eventStatus: e.event_status || 'UPCOMING',
+          registration_status: e.registration_status || 'OPEN',
+          event_status: e.event_status || 'UPCOMING',
+          maxParticipants: e.max_participants ? Number(e.max_participants) : 48,
+          max_participants: e.max_participants ? Number(e.max_participants) : 48,
           startDate: e.start_date || e.date || '',
           endDate: e.end_date || e.date || '',
           description: e.description || ''
@@ -725,6 +733,10 @@ class TournamentStore {
             prizePool: Number(e.prize_pool || 0),
             registrationStatus: e.registration_status || 'OPEN',
             eventStatus: e.event_status || 'UPCOMING',
+            registration_status: e.registration_status || 'OPEN',
+            event_status: e.event_status || 'UPCOMING',
+            maxParticipants: e.max_participants ? Number(e.max_participants) : 48,
+            max_participants: e.max_participants ? Number(e.max_participants) : 48,
             startDate: e.start_date || e.date || '',
             endDate: e.end_date || e.date || '',
             description: e.description || ''

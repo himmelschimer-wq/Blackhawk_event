@@ -51,8 +51,14 @@ export const EventRulesBriefingModal: React.FC<EventRulesBriefingModalProps> = (
   ];
   const generalRules = parseRules(event.generalRules).length > 0 ? parseRules(event.generalRules) : defaultGeneralRules;
 
+  const registeredCount = event.registeredCount ?? event.registered_count;
+  const isRegistrationClosed =
+    event.registration_status?.toUpperCase() === 'CLOSED' ||
+    ['COMPLETED', 'CLOSED', 'CANCELLED'].includes(event.event_status?.toUpperCase() || '') ||
+    (registeredCount !== undefined && registeredCount >= (event.max_participants || 48));
+
   const handleProceed = () => {
-    if (!agreedToRules) return;
+    if (!agreedToRules || isRegistrationClosed) return;
     sfx.playClick();
     onProceedToRegister(event.gameName, event.id);
   };
@@ -107,6 +113,23 @@ export const EventRulesBriefingModal: React.FC<EventRulesBriefingModalProps> = (
         {/* Scrollable Content */}
         <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-5 text-zinc-300 overscroll-contain">
           
+          {/* Closed Alert Banner */}
+          {isRegistrationClosed && (
+            <div className="p-3.5 sm:p-4 rounded-xl bg-red-950/60 border border-red-500/60 text-red-200 flex items-center gap-3 animate-in fade-in">
+              <div className="w-8 h-8 rounded-lg bg-red-600/20 border border-red-500/40 flex items-center justify-center shrink-0">
+                <span className="text-base">🔒</span>
+              </div>
+              <div>
+                <h4 className="font-cinzel text-xs sm:text-sm font-bold text-white uppercase tracking-wider">
+                  REGISTRATION CLOSED
+                </h4>
+                <p className="text-xs text-red-200/90 font-sans mt-0.5">
+                  Registration for this tournament is currently closed.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Quick Tournament Specs Pill Header */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-3 rounded-xl bg-black/60 border border-white/5 text-center">
             <div className="p-1">
@@ -229,15 +252,17 @@ export const EventRulesBriefingModal: React.FC<EventRulesBriefingModalProps> = (
 
           <button
             onClick={handleProceed}
-            disabled={!agreedToRules}
-            className={`w-full sm:w-auto px-6 py-2.5 rounded-full font-cinzel font-bold text-xs sm:text-sm uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer ${
-              agreedToRules
-                ? 'bg-gradient-to-r from-[#D71920] to-[#b3141a] hover:from-[#e3262e] hover:to-[#c4161d] text-white shadow-[0_0_20px_rgba(215,25,32,0.4)] active:scale-95'
-                : 'bg-zinc-800 text-zinc-500 border border-zinc-700 cursor-not-allowed opacity-60'
+            disabled={!agreedToRules || isRegistrationClosed}
+            className={`w-full sm:w-auto px-6 py-2.5 rounded-full font-cinzel font-bold text-xs sm:text-sm uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-2 ${
+              isRegistrationClosed
+                ? 'bg-zinc-800 text-zinc-500 border border-zinc-700/60 cursor-not-allowed opacity-60'
+                : agreedToRules
+                  ? 'bg-gradient-to-r from-[#D71920] to-[#b3141a] hover:from-[#e3262e] hover:to-[#c4161d] text-white shadow-[0_0_20px_rgba(215,25,32,0.4)] active:scale-95 cursor-pointer'
+                  : 'bg-zinc-800 text-zinc-500 border border-zinc-700 cursor-not-allowed opacity-60'
             }`}
           >
-            <span>PROCEED TO REGISTRATION</span>
-            <ArrowRight className="w-4 h-4" />
+            <span>{isRegistrationClosed ? '🔒 REGISTRATION CLOSED' : 'PROCEED TO REGISTRATION'}</span>
+            {!isRegistrationClosed && <ArrowRight className="w-4 h-4" />}
           </button>
         </div>
 

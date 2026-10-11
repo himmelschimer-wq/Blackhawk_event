@@ -16,6 +16,7 @@ import { IntroSplash } from './components/IntroSplash';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { adminApi } from './lib/adminApi';
 import { type DBEventItem } from './components/UpcomingEventsAndLeaderboard';
+import { ToastProvider } from './components/Toast';
 
 export function App() {
   const isDiscordCallback = typeof window !== 'undefined' && (
@@ -225,7 +226,8 @@ export function App() {
 
   // Otherwise, render Public BlackHawk Gaming Experience
   return (
-    <div className="min-h-screen bg-[#080808] text-[#e5e5e5] font-sans antialiased selection:bg-[#D71920] selection:text-white">
+    <ToastProvider>
+      <div className="min-h-screen bg-[#080808] text-[#e5e5e5] font-sans antialiased selection:bg-[#D71920] selection:text-white">
       {/* Premium Text-Only BlackHawk Intro */}
       {showIntroSplash && (
         <IntroSplash 
@@ -356,7 +358,8 @@ export function App() {
           <span className="text-[9px] text-emerald-400/60 font-mono hidden sm:inline">(Ctrl+Shift+A)</span>
         </button>
       )}
-    </div>
+      </div>
+    </ToastProvider>
   );
 }
 

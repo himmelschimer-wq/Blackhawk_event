@@ -24,6 +24,8 @@ import {
 } from 'lucide-react';
 import { sfx } from '../utils/sfx';
 import { safeFetchJson } from '../lib/apiHelper';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { useToast } from './Toast';
 
 interface RegistrationProps {
   preSelectedGame?: string;
@@ -56,7 +58,17 @@ export interface DBEventItem {
   prizePool: number;
   maxParticipants?: number;
   registrationStatus?: string;
+  eventStatus?: string;
+  // Supabase columns
+  registration_status?: string;
+  event_status?: string;
+  max_participants?: number;
+  prize_pool?: number;
+  registeredCount?: number;
+  registered_count?: number;
 }
+
+export type Event = DBEventItem;
 
 export const RegistrationSection: React.FC<RegistrationProps> = ({ 
   preSelectedGame, 
@@ -64,6 +76,8 @@ export const RegistrationSection: React.FC<RegistrationProps> = ({
   onRegistrationSuccess, 
   onClose: _onClose 
 }) => {
+  const { showToast } = useToast();
+
   // Database Games List
   const [dbGames, setDbGames] = useState<DBGameItem[]>([]);
   const [dbEvents, setDbEvents] = useState<DBEventItem[]>([]);
@@ -153,18 +167,49 @@ export const RegistrationSection: React.FC<RegistrationProps> = ({
       safeFetchJson<DBGameItem[]>('/api/games', [], 'games'),
       safeFetchJson<DBEventItem[]>('/api/events', [], 'events')
     ])
-      .then(([gamesData, eventsData]: [DBGameItem[], DBEventItem[]]) => {
+      .then(async ([gamesData, eventsData]: [DBGameItem[], DBEventItem[]]) => {
         if (Array.isArray(gamesData)) {
           const activeGames = gamesData.filter(g => g.active === 1 || g.active === true);
           setDbGames(activeGames);
 
+          let normalizedEvents: DBEventItem[] = [];
           if (Array.isArray(eventsData)) {
-            setDbEvents(eventsData);
+            // Count registered athletes per event from Supabase if configured
+            const regCountMap: Record<string, number> = {};
+            if (isSupabaseConfigured) {
+              try {
+                const { data: regRows } = await supabase.from('registrations').select('id, event_id, game_id');
+                if (regRows) {
+                  regRows.forEach((r: any) => {
+                    const evId = r.event_id || r.eventId;
+                    if (evId) regCountMap[evId] = (regCountMap[evId] || 0) + 1;
+                    const gId = r.game_id || r.gameId;
+                    if (gId) regCountMap[gId] = (regCountMap[gId] || 0) + 1;
+                  });
+                }
+              } catch {}
+            }
+
+            normalizedEvents = eventsData.map((e: any) => {
+              const registeredCount = e.registeredCount ?? e.registered_count ?? regCountMap[e.id] ?? 0;
+              return {
+                ...e,
+                registration_status: e.registration_status || e.registrationStatus || 'OPEN',
+                registrationStatus: e.registration_status || e.registrationStatus || 'OPEN',
+                event_status: e.event_status || e.eventStatus || 'UPCOMING',
+                eventStatus: e.event_status || e.eventStatus || 'UPCOMING',
+                max_participants: e.max_participants ? Number(e.max_participants) : (e.maxParticipants ? Number(e.maxParticipants) : 48),
+                maxParticipants: e.max_participants ? Number(e.max_participants) : (e.maxParticipants ? Number(e.maxParticipants) : 48),
+                registeredCount,
+                registered_count: registeredCount,
+              };
+            });
+            setDbEvents(normalizedEvents);
           }
 
           // Handle initial selected game and event
-          if (preSelectedEventId && Array.isArray(eventsData)) {
-            const foundEvent = eventsData.find(e => e.id === preSelectedEventId);
+          if (preSelectedEventId && normalizedEvents.length > 0) {
+            const foundEvent = normalizedEvents.find(e => e.id === preSelectedEventId);
             if (foundEvent) {
               setSelectedGames([foundEvent.gameName]);
               setSelectedEventIds([foundEvent.id]);
@@ -181,7 +226,7 @@ export const RegistrationSection: React.FC<RegistrationProps> = ({
               if (match) {
                 setSelectedGames([match.name]);
                 // Select events for this game
-                const gameEvs = eventsData.filter(
+                const gameEvs = normalizedEvents.filter(
                   e => e.gameName?.toLowerCase() === match.name.toLowerCase() || e.gameId?.toLowerCase() === match.id.toLowerCase()
                 );
                 setSelectedEventIds(gameEvs.map(e => e.id));
@@ -190,7 +235,7 @@ export const RegistrationSection: React.FC<RegistrationProps> = ({
               }
             } else {
               setSelectedGames([activeGames[0].name]);
-              const firstGameEvs = eventsData.filter(
+              const firstGameEvs = normalizedEvents.filter(
                 e => e.gameName?.toLowerCase() === activeGames[0].name.toLowerCase() || e.gameId?.toLowerCase() === activeGames[0].id.toLowerCase()
               );
               setSelectedEventIds(firstGameEvs.map(e => e.id));
@@ -248,9 +293,32 @@ export const RegistrationSection: React.FC<RegistrationProps> = ({
         time: '6:00 PM',
         format: g.format || 'Solo',
         prizePool: g.defaultPrizePool || 350,
-        maxParticipants: 100,
-        registrationStatus: 'OPEN'
+        maxParticipants: 48,
+        registrationStatus: 'OPEN',
+        registration_status: 'OPEN',
+        eventStatus: 'UPCOMING',
+        event_status: 'UPCOMING',
+        max_participants: 48,
       }));
+
+  // Closed status evaluation helper
+  const isEventClosed = (eventItem: DBEventItem | null | undefined): boolean => {
+    if (!eventItem) return false;
+    const registeredCount = eventItem.registeredCount ?? eventItem.registered_count;
+    return (
+      eventItem.registration_status?.toUpperCase() === 'CLOSED' ||
+      ['COMPLETED', 'CLOSED', 'CANCELLED'].includes(eventItem.event_status?.toUpperCase() || '') ||
+      (registeredCount !== undefined && registeredCount >= (eventItem.max_participants || 48))
+    );
+  };
+
+  // Determine if the current active target event is closed
+  const preSelectedEvent = preSelectedEventId ? allEventsList.find(e => e.id === preSelectedEventId) : null;
+  const currentSelectedEvents = allEventsList.filter(e => selectedEventIds.includes(e.id));
+  const isCurrentEventClosed = Boolean(
+    (preSelectedEvent && isEventClosed(preSelectedEvent)) ||
+    (currentSelectedEvents.length > 0 && currentSelectedEvents.every(e => isEventClosed(e)))
+  );
 
   const displayedEvents = gameFilter === 'ALL'
     ? allEventsList
@@ -313,6 +381,14 @@ export const RegistrationSection: React.FC<RegistrationProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (isCurrentEventClosed) {
+      const errorMsg = 'Registration for this tournament is currently closed.';
+      showToast(errorMsg, 'error');
+      alert(`Registration Closed: ${errorMsg}`);
+      return;
+    }
+
     if (selectedEventIds.length === 0 && selectedGames.length === 0) {
       alert("Please select at least one tournament event to register.");
       return;
@@ -449,6 +525,31 @@ export const RegistrationSection: React.FC<RegistrationProps> = ({
         }
       }
 
+      // Guard: Re-check event registration_status in Supabase before insert
+      if (isSupabaseConfigured) {
+        for (const entry of entries) {
+          if (entry.eventId) {
+            const { data: eventRow, error: fetchErr } = await supabase
+              .from('events')
+              .select('id, title, registration_status, event_status, max_participants')
+              .eq('id', entry.eventId)
+              .maybeSingle();
+
+            if (!fetchErr && eventRow) {
+              const regStatus = (eventRow.registration_status || '').toUpperCase();
+              const evStatus = (eventRow.event_status || '').toUpperCase();
+              if (regStatus === 'CLOSED' || ['COMPLETED', 'CLOSED', 'CANCELLED'].includes(evStatus)) {
+                setIsSubmitting(false);
+                const errorMsg = 'Registration for this tournament is currently closed.';
+                showToast(errorMsg, 'error');
+                alert(`Registration Error: ${errorMsg}`);
+                return;
+              }
+            }
+          }
+        }
+      }
+
       // Submit directly to REAL database API endpoint & fallback handlers
       let result: any = null;
       try {
@@ -517,7 +618,12 @@ export const RegistrationSection: React.FC<RegistrationProps> = ({
       }
     } catch (err: any) {
       setIsSubmitting(false);
-      alert(`Registration Error: ${err.message || 'Please check your inputs and try again.'}`);
+      const isClosedMsg = err?.message?.toLowerCase()?.includes('closed');
+      const errorMsg = isClosedMsg 
+        ? 'Registration for this tournament is currently closed.'
+        : `Registration Error: ${err.message || 'Please check your inputs and try again.'}`;
+      showToast(errorMsg, 'error');
+      alert(errorMsg);
     }
   };
 
@@ -583,6 +689,23 @@ export const RegistrationSection: React.FC<RegistrationProps> = ({
         {!confirmedPass ? (
           <div className="bg-[#0c0c10] border border-white/10 rounded-xl sm:rounded-2xl p-3 sm:p-5 shadow-[0_0_30px_rgba(0,0,0,0.8)] relative">
             
+            {/* Closed Registration Alert Banner */}
+            {isCurrentEventClosed && (
+              <div className="mb-4 sm:mb-5 p-4 rounded-xl bg-gradient-to-r from-red-950/80 via-red-900/60 to-black border-2 border-[#D71920] text-red-100 flex items-center gap-3.5 shadow-[0_0_25px_rgba(215,25,32,0.4)] animate-in fade-in slide-in-from-top-2">
+                <div className="w-10 h-10 rounded-lg bg-[#D71920]/25 border border-[#D71920] flex items-center justify-center shrink-0 text-xl shadow-[0_0_10px_rgba(215,25,32,0.5)]">
+                  🔒
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-cinzel text-xs sm:text-sm font-bold text-white uppercase tracking-wider">
+                    REGISTRATION CLOSED
+                  </h4>
+                  <p className="text-xs sm:text-sm text-red-200/90 font-sans mt-0.5 leading-snug">
+                    Registration for this tournament is currently closed.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Step 1: Select One or Multiple Events */}
             <div className="mb-4 sm:mb-5">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-2 border-b border-white/10 mb-2.5 gap-2">
@@ -674,15 +797,21 @@ export const RegistrationSection: React.FC<RegistrationProps> = ({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   {displayedEvents.map((ev) => {
                     const isSelected = selectedEventIds.includes(ev.id);
+                    const closed = isEventClosed(ev);
                     return (
                       <div
                         key={ev.id}
-                        onClick={() => toggleEvent(ev.id, ev.gameName)}
-                        onMouseEnter={() => sfx.playHover()}
-                        className={`p-3 rounded-xl border text-left transition-all duration-200 flex flex-col justify-between cursor-pointer relative group ${
-                          isSelected
-                            ? 'bg-gradient-to-r from-[#220a0a] to-[#120707] border-[#D71920] shadow-[0_0_15px_rgba(215,25,32,0.35)] ring-1 ring-[#D71920]'
-                            : 'bg-[#09090d] border-white/10 hover:border-white/20 hover:bg-[#0e0e14]'
+                        onClick={() => {
+                          if (closed) return;
+                          toggleEvent(ev.id, ev.gameName);
+                        }}
+                        onMouseEnter={() => !closed && sfx.playHover()}
+                        className={`p-3 rounded-xl border text-left transition-all duration-200 flex flex-col justify-between relative group ${
+                          closed
+                            ? 'bg-zinc-950/70 border-zinc-800/80 opacity-60 cursor-not-allowed'
+                            : isSelected
+                              ? 'bg-gradient-to-r from-[#220a0a] to-[#120707] border-[#D71920] shadow-[0_0_15px_rgba(215,25,32,0.35)] ring-1 ring-[#D71920] cursor-pointer'
+                              : 'bg-[#09090d] border-white/10 hover:border-white/20 hover:bg-[#0e0e14] cursor-pointer'
                         }`}
                       >
                         <div className="flex items-start justify-between gap-2 mb-2">
@@ -691,11 +820,18 @@ export const RegistrationSection: React.FC<RegistrationProps> = ({
                               {getGameIcon(ev.gameName)}
                             </div>
                             <div className="min-w-0">
-                              <span className="px-1.5 py-0.5 rounded bg-white/10 text-[9px] font-tech text-[#ff4d4d] font-bold uppercase tracking-wider inline-block">
-                                {ev.gameName}
-                              </span>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="px-1.5 py-0.5 rounded bg-white/10 text-[9px] font-tech text-[#ff4d4d] font-bold uppercase tracking-wider inline-block">
+                                  {ev.gameName}
+                                </span>
+                                {closed && (
+                                  <span className="px-1.5 py-0.2 rounded bg-red-950/70 border border-red-500/40 text-[9px] font-tech text-red-400 font-bold uppercase tracking-wider">
+                                    CLOSED
+                                  </span>
+                                )}
+                              </div>
                               <h4 className={`font-cinzel font-bold text-xs sm:text-sm uppercase leading-tight truncate mt-0.5 ${
-                                isSelected ? 'text-white' : 'text-zinc-200'
+                                closed ? 'text-zinc-500' : isSelected ? 'text-white' : 'text-zinc-200'
                               }`}>
                                 {ev.title}
                               </h4>
@@ -703,11 +839,13 @@ export const RegistrationSection: React.FC<RegistrationProps> = ({
                           </div>
 
                           <div className={`w-5 h-5 rounded flex items-center justify-center shrink-0 border transition-all ${
-                            isSelected 
-                              ? 'bg-[#D71920] border-[#D71920] text-white shadow-sm' 
-                              : 'border-white/20 bg-black/60 text-transparent group-hover:border-white/40'
+                            closed
+                              ? 'border-zinc-700 bg-zinc-900 text-zinc-500'
+                              : isSelected 
+                                ? 'bg-[#D71920] border-[#D71920] text-white shadow-sm' 
+                                : 'border-white/20 bg-black/60 text-transparent group-hover:border-white/40'
                           }`}>
-                            <Check className="w-3.5 h-3.5" />
+                            {closed ? <span className="text-[10px]">🔒</span> : <Check className="w-3.5 h-3.5" />}
                           </div>
                         </div>
 
@@ -1199,10 +1337,18 @@ export const RegistrationSection: React.FC<RegistrationProps> = ({
               {/* Submit CTA */}
               <button
                 type="submit"
-                disabled={isSubmitting || selectedGames.length === 0}
-                className="w-full py-2.5 sm:py-3 bg-gradient-to-r from-[#D71920] to-[#b3141a] hover:from-[#e3262e] hover:to-[#c4161d] text-white font-cinzel font-bold text-xs sm:text-sm tracking-wider uppercase transition-all duration-200 shadow-[0_0_20px_rgba(215,25,32,0.4)] hover:shadow-[0_0_28px_rgba(215,25,32,0.6)] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 rounded-lg active:scale-[0.99]"
+                disabled={isSubmitting || selectedGames.length === 0 || isCurrentEventClosed}
+                className={`w-full py-2.5 sm:py-3 font-cinzel font-bold text-xs sm:text-sm tracking-wider uppercase transition-all duration-200 flex items-center justify-center gap-2 rounded-lg ${
+                  isCurrentEventClosed
+                    ? 'bg-zinc-800/90 text-zinc-400 border border-zinc-700/60 cursor-not-allowed opacity-60 shadow-none'
+                    : isSubmitting || selectedGames.length === 0
+                      ? 'bg-gradient-to-r from-[#D71920] to-[#b3141a] text-white opacity-50 cursor-not-allowed'
+                      : 'bg-gradient-to-r from-[#D71920] to-[#b3141a] hover:from-[#e3262e] hover:to-[#c4161d] text-white shadow-[0_0_20px_rgba(215,25,32,0.4)] hover:shadow-[0_0_28px_rgba(215,25,32,0.6)] cursor-pointer active:scale-[0.99]'
+                }`}
               >
-                {isSubmitting ? (
+                {isCurrentEventClosed ? (
+                  <span>🔒 Registration Closed</span>
+                ) : isSubmitting ? (
                   <>
                     <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
                     <span>REGISTERING FOR {selectedGames.length} DISCIPLINES...</span>

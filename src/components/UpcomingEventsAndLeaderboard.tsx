@@ -5,6 +5,8 @@ import { PlayerProfileModal, type PlayerProfileData } from './PlayerProfileModal
 import { safeFetchJson } from '../lib/apiHelper';
 import { ScrollReveal } from './ScrollReveal';
 
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
+
 interface UpcomingEventsAndLeaderboardProps {
   onRegisterEvent: (gameName: string, eventId?: string) => void;
   onSelectEvent?: (event: DBEventItem) => void;
@@ -24,13 +26,22 @@ export interface DBEventItem {
   time: string;
   format: string;
   prizePool: number;
-  maxParticipants: number;
-  registrationStatus: string;
-  eventStatus: string;
+  maxParticipants?: number;
+  registrationStatus?: string;
+  eventStatus?: string;
   rules?: string;
   generalRules?: string;
   banner?: string;
+  // Supabase database columns
+  registration_status?: string;
+  event_status?: string;
+  max_participants?: number;
+  prize_pool?: number;
+  registeredCount?: number;
+  registered_count?: number;
 }
+
+export type Event = DBEventItem;
 
 export interface DBLeaderboardItem {
   id: string;
@@ -83,7 +94,37 @@ export const UpcomingEventsAndLeaderboard: React.FC<UpcomingEventsAndLeaderboard
     try {
       const data = await safeFetchJson<any[]>('/api/events', [], 'events');
       if (Array.isArray(data)) {
-        setEvents(data);
+        // Build registered count map from Supabase if configured
+        const regCountMap: Record<string, number> = {};
+        if (isSupabaseConfigured) {
+          try {
+            const { data: regRows } = await supabase.from('registrations').select('id, event_id, game_id');
+            if (regRows) {
+              regRows.forEach((r: any) => {
+                const evId = r.event_id || r.eventId;
+                if (evId) regCountMap[evId] = (regCountMap[evId] || 0) + 1;
+                const gId = r.game_id || r.gameId;
+                if (gId) regCountMap[gId] = (regCountMap[gId] || 0) + 1;
+              });
+            }
+          } catch {}
+        }
+
+        const normalizedEvents: DBEventItem[] = data.map((e: any) => {
+          const registeredCount = e.registeredCount ?? e.registered_count ?? regCountMap[e.id] ?? 0;
+          return {
+            ...e,
+            registration_status: e.registration_status || e.registrationStatus || 'OPEN',
+            registrationStatus: e.registration_status || e.registrationStatus || 'OPEN',
+            event_status: e.event_status || e.eventStatus || 'UPCOMING',
+            eventStatus: e.event_status || e.eventStatus || 'UPCOMING',
+            max_participants: e.max_participants ? Number(e.max_participants) : (e.maxParticipants ? Number(e.maxParticipants) : 48),
+            maxParticipants: e.max_participants ? Number(e.max_participants) : (e.maxParticipants ? Number(e.maxParticipants) : 48),
+            registeredCount,
+            registered_count: registeredCount,
+          };
+        });
+        setEvents(normalizedEvents);
       }
     } catch (err) {
       console.warn('Failed to load events:', err);
@@ -226,89 +267,116 @@ export const UpcomingEventsAndLeaderboard: React.FC<UpcomingEventsAndLeaderboard
 
               {/* Event Rows from Database */}
               <div className="space-y-2.5 md:space-y-0 md:divide-y md:divide-white/[0.05]">
-                {filteredEvents.map((event) => (
-                  <div
-                    key={event.id}
-                    className="p-3.5 md:py-3.5 md:px-3 bg-white/[0.02] md:bg-transparent border border-white/[0.06] md:border-0 rounded-xl md:rounded-none group flex flex-col md:grid md:grid-cols-[1fr_130px_90px_85px_150px] gap-3 md:gap-3 md:items-center transition-all hover:bg-white/[0.03] md:hover:bg-white/[0.02]"
-                  >
-                    {/* 1. Game & Title */}
-                    <div className="flex items-center justify-between md:justify-start gap-3 min-w-0">
-                      <div className="flex items-center gap-3 min-w-0">
-                        {/* Mini Thumbnail */}
-                        <div className="relative w-11 h-11 sm:w-11 sm:h-11 rounded-lg overflow-hidden border border-white/10 shrink-0 bg-zinc-900">
-                          <img
-                            src={event.banner || '/assets/official_game_bgmi.png'}
-                            alt={event.gameName}
-                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                          />
-                          <div className="absolute inset-0 bg-black/40" />
+                {filteredEvents.map((event) => {
+                  const registeredCount = event.registeredCount ?? event.registered_count;
+                  const isRegistrationClosed =
+                    event.registration_status?.toUpperCase() === 'CLOSED' ||
+                    ['COMPLETED', 'CLOSED', 'CANCELLED'].includes(event.event_status?.toUpperCase() || '') ||
+                    (registeredCount !== undefined && registeredCount >= (event.max_participants || 48));
+
+                  return (
+                    <div
+                      key={event.id}
+                      className="p-3.5 md:py-3.5 md:px-3 bg-white/[0.02] md:bg-transparent border border-white/[0.06] md:border-0 rounded-xl md:rounded-none group flex flex-col md:grid md:grid-cols-[1fr_130px_90px_85px_150px] gap-3 md:gap-3 md:items-center transition-all hover:bg-white/[0.03] md:hover:bg-white/[0.02]"
+                    >
+                      {/* 1. Game & Title */}
+                      <div className="flex items-center justify-between md:justify-start gap-3 min-w-0">
+                        <div className="flex items-center gap-3 min-w-0">
+                          {/* Mini Thumbnail */}
+                          <div className="relative w-11 h-11 sm:w-11 sm:h-11 rounded-lg overflow-hidden border border-white/10 shrink-0 bg-zinc-900">
+                            <img
+                              src={event.banner || '/assets/official_game_bgmi.png'}
+                              alt={event.gameName}
+                              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                            />
+                            <div className="absolute inset-0 bg-black/40" />
+                          </div>
+
+                          {/* Game & Tournament Name */}
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <h3 className="font-cinzel text-xs sm:text-sm font-bold text-white tracking-wide group-hover:text-[#f0f0f5] truncate">
+                                {event.gameName}
+                              </h3>
+                              {isRegistrationClosed && (
+                                <span className="px-1.5 py-0.2 rounded bg-red-950/70 border border-red-500/40 text-[9px] font-tech text-red-400 font-bold uppercase tracking-wider">
+                                  CLOSED
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-[#82828a] font-normal truncate">
+                              {event.title}
+                            </p>
+                          </div>
                         </div>
 
-                        {/* Game & Tournament Name */}
-                        <div className="min-w-0">
-                          <h3 className="font-cinzel text-xs sm:text-sm font-bold text-white tracking-wide group-hover:text-[#f0f0f5] truncate">
-                            {event.gameName}
-                          </h3>
-                          <p className="text-[11px] text-[#82828a] font-normal truncate">
-                            {event.title}
+                        {/* Format Tag visible on mobile top-right */}
+                        <span className="md:hidden px-2 py-0.5 rounded-full border border-white/10 bg-white/[0.03] text-[9px] font-semibold tracking-wider text-zinc-300 uppercase shrink-0">
+                          {event.format}
+                        </span>
+                      </div>
+
+                      {/* 2. Schedule (Date & Time) */}
+                      <div className="flex items-center gap-2 text-xs text-[#9a9aa0] pt-1 md:pt-0 border-t border-white/[0.04] md:border-0 min-w-0">
+                        <Calendar className="w-3.5 h-3.5 text-[#D71920]/80 shrink-0" />
+                        <div className="min-w-0 truncate">
+                          <p className="font-medium text-white/90 text-[11px] sm:text-xs tracking-wide truncate">
+                            {event.date}
                           </p>
+                          <p className="text-[10px] text-[#71717a] truncate">{event.time}</p>
                         </div>
                       </div>
 
-                      {/* Format Tag visible on mobile top-right */}
-                      <span className="md:hidden px-2 py-0.5 rounded-full border border-white/10 bg-white/[0.03] text-[9px] font-semibold tracking-wider text-zinc-300 uppercase shrink-0">
-                        {event.format}
-                      </span>
-                    </div>
-
-                    {/* 2. Schedule (Date & Time) */}
-                    <div className="flex items-center gap-2 text-xs text-[#9a9aa0] pt-1 md:pt-0 border-t border-white/[0.04] md:border-0 min-w-0">
-                      <Calendar className="w-3.5 h-3.5 text-[#D71920]/80 shrink-0" />
-                      <div className="min-w-0 truncate">
-                        <p className="font-medium text-white/90 text-[11px] sm:text-xs tracking-wide truncate">
-                          {event.date}
+                      {/* 3. Prize Pool */}
+                      <div className="text-right md:text-center shrink-0">
+                        <p className="font-bebas text-base sm:text-lg text-[#f5c464] tracking-wider leading-none">
+                          ₹{event.prizePool.toLocaleString()}
                         </p>
-                        <p className="text-[10px] text-[#71717a] truncate">{event.time}</p>
+                        <p className="text-[9px] font-semibold tracking-[0.16em] text-[#71717a] uppercase">
+                          PRIZE POOL
+                        </p>
+                      </div>
+
+                      {/* 4. Format Tag */}
+                      <div className="hidden md:flex justify-center shrink-0">
+                        <span className="px-2 py-0.5 rounded-full border border-white/10 bg-white/[0.03] text-[9px] font-semibold tracking-wider text-zinc-300 uppercase whitespace-nowrap">
+                          {event.format}
+                        </span>
+                      </div>
+
+                      {/* 5. Action Register Button */}
+                      <div className="flex items-center justify-end shrink-0 pt-1 md:pt-0">
+                        <button
+                          disabled={isRegistrationClosed}
+                          onClick={() => {
+                            if (isRegistrationClosed) return;
+                            sfx.playClick();
+                            if (onSelectEvent) {
+                              onSelectEvent(event);
+                            } else {
+                              onRegisterEvent(event.gameName, event.id);
+                            }
+                          }}
+                          onMouseEnter={() => !isRegistrationClosed && sfx.playHover()}
+                          className={`w-full md:w-auto px-3.5 py-1.5 rounded-full border text-[11px] font-semibold tracking-wide transition-all duration-200 flex items-center justify-center gap-1.5 whitespace-nowrap ${
+                            isRegistrationClosed
+                              ? 'bg-zinc-800/90 border-zinc-700/60 text-zinc-400 opacity-60 cursor-not-allowed shadow-none hover:bg-zinc-800/90 hover:border-zinc-700/60'
+                              : 'border-white/15 bg-white/[0.02] active:bg-[#D71920]/25 hover:bg-[#D71920]/15 hover:border-[#D71920]/60 text-white/90 hover:text-white cursor-pointer group-hover:border-white/30'
+                          }`}
+                        >
+                          {isRegistrationClosed ? (
+                            <span>🔒 Registration Closed</span>
+                          ) : (
+                            <>
+                              <span>Register Now</span>
+                              <span className="text-[#D71920] group-hover:translate-x-0.5 transition-transform">→</span>
+                            </>
+                          )}
+                        </button>
                       </div>
                     </div>
-
-                    {/* 3. Prize Pool */}
-                    <div className="text-right md:text-center shrink-0">
-                      <p className="font-bebas text-base sm:text-lg text-[#f5c464] tracking-wider leading-none">
-                        ₹{event.prizePool.toLocaleString()}
-                      </p>
-                      <p className="text-[9px] font-semibold tracking-[0.16em] text-[#71717a] uppercase">
-                        PRIZE POOL
-                      </p>
-                    </div>
-
-                    {/* 4. Format Tag */}
-                    <div className="hidden md:flex justify-center shrink-0">
-                      <span className="px-2 py-0.5 rounded-full border border-white/10 bg-white/[0.03] text-[9px] font-semibold tracking-wider text-zinc-300 uppercase whitespace-nowrap">
-                        {event.format}
-                      </span>
-                    </div>
-
-                    {/* 5. Action Register Button */}
-                    <div className="flex items-center justify-end shrink-0 pt-1 md:pt-0">
-                      <button
-                        onClick={() => {
-                          sfx.playClick();
-                          if (onSelectEvent) {
-                            onSelectEvent(event);
-                          } else {
-                            onRegisterEvent(event.gameName, event.id);
-                          }
-                        }}
-                        onMouseEnter={() => sfx.playHover()}
-                        className="w-full md:w-auto px-3.5 py-1.5 rounded-full border border-white/15 bg-white/[0.02] active:bg-[#D71920]/25 hover:bg-[#D71920]/15 hover:border-[#D71920]/60 text-white/90 hover:text-white text-[11px] font-semibold tracking-wide transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 group-hover:border-white/30 whitespace-nowrap"
-                      >
-                        <span>View Rules &amp; Register</span>
-                        <span className="text-[#D71920] group-hover:translate-x-0.5 transition-transform">→</span>
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>
